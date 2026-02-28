@@ -1,0 +1,521 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAPER STREET</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Rubik+Mono+One&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --acid-green: #ccff00;
+            --blood-red: #ff003c;
+            --deep-black: #0d0d0d;
+            --street-gray: #2a2a2a;
+            --panel-alpha: rgba(13, 13, 13, 0.7);
+            --font-tag: 'Permanent Marker', cursive;
+            --font-block: 'Rubik Mono One', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--deep-black);
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)),
+                url('https://www.transparenttextures.com/patterns/stardust.png');
+            color: #fff;
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- ГЛАВНЫЙ ЭКРАН --- */
+        #menu-screen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle, #222 0%, #000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: transform 0.6s cubic-bezier(0.85, 0, 0.15, 1);
+        }
+
+        #menu-screen.hide {
+            transform: translateY(-100%);
+        }
+
+        .street-title {
+            font-family: var(--font-tag);
+            font-size: 8rem;
+            color: var(--acid-green);
+            text-shadow: 5px 5px 0px var(--blood-red), 10px 10px 20px rgba(0,0,0,0.5);
+            transform: rotate(-3deg);
+            margin-bottom: 40px;
+        }
+
+        .menu-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 350px;
+        }
+
+        .btn-street {
+            background: var(--street-gray);
+            border: 3px solid #fff;
+            color: #fff;
+            padding: 15px;
+            font-family: var(--font-block);
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+            box-shadow: 5px 5px 0px var(--acid-green);
+        }
+
+        .btn-street:hover {
+            background: var(--acid-green);
+            color: #000;
+            transform: translate(-3px, -3px);
+            box-shadow: 8px 8px 0px var(--blood-red);
+        }
+
+        /* --- ИГРОВАЯ ЗОНА --- */
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        .top-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .game-area {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            padding: 20px;
+        }
+
+        /* Боковые тумбы */
+        .sidebar-panel {
+            width: 200px;
+            background: var(--panel-alpha);
+            border: 4px solid var(--street-gray);
+            padding: 20px;
+            backdrop-filter: blur(5px);
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
+        }
+
+        .sidebar-label {
+            font-family: var(--font-tag);
+            font-size: 1.8rem;
+            color: var(--acid-green);
+            display: block;
+            margin-bottom: 10px;
+            border-bottom: 2px solid var(--acid-green);
+        }
+
+        .sidebar-val {
+            font-family: var(--font-block);
+            font-size: 2.5rem;
+            text-align: center;
+            text-shadow: 2px 2px 0px var(--blood-red);
+        }
+
+        .sidebar-hint {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .sidebar-hint b { color: #fff; }
+
+        /* Игровое поле */
+        #board-frame {
+            background: #111;
+            border: 6px solid var(--street-gray);
+            padding: 5px;
+            overflow: auto;
+            max-width: 85vw;
+            max-height: 70vh;
+        }
+
+        #grid {
+            display: grid;
+            gap: 2px;
+        }
+
+        .cell {
+            width: 32px;
+            height: 32px;
+            background: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-block);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.1s, box-shadow 0.1s;
+        }
+
+        /* Подсветка курсора */
+        .cell:hover:not(.open) {
+            background: #333;
+            box-shadow: inset 0 0 10px var(--acid-green);
+            z-index: 5;
+        }
+
+        .cell.open {
+            background: #000;
+            cursor: default;
+        }
+
+        .cell.flag::after {
+            content: '!';
+            font-family: var(--font-tag);
+            color: var(--acid-green);
+            font-size: 1.5rem;
+        }
+
+        .cell.mine {
+            background: var(--blood-red) !important;
+            box-shadow: 0 0 20px var(--blood-red);
+        }
+
+        /* Цвета цифр */
+        .n1 { color: #00ffff; }
+        .n2 { color: #ccff00; }
+        .n3 { color: #ff00ff; }
+        .n4 { color: #ff0000; }
+
+        /* --- ФИНАЛЬНОЕ ОКНО (ПОЛУПРОЗРАЧНОЕ) --- */
+        #finish-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .finish-card {
+            background: var(--panel-alpha);
+            border: 5px solid var(--acid-green);
+            padding: 50px;
+            text-align: center;
+            width: 500px;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+        }
+
+        .finish-title {
+            font-family: var(--font-tag);
+            font-size: 4rem;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <h1 class="street-title">SAPER</h1>
+        <div class="menu-list">
+            <button class="btn-street" onclick="App.start('easy')">ЛЕГКАЯ</button>
+            <button class="btn-street" onclick="App.start('medium')">СРЕДНЯЯ</button>
+            <button class="btn-street" onclick="App.start('hard')">СЛОЖНАЯ</button>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <div class="top-controls">
+            <button class="btn-street" style="padding: 5px 20px" onclick="App.exit()">В МЕНЮ</button>
+            <button class="btn-street" style="padding: 5px 20px" onclick="App.reset()">РЕСТАРТ</button>
+        </div>
+
+        <div class="game-area">
+            <div class="sidebar-panel">
+                <span class="sidebar-label">ФЛАЖКИ</span>
+                <div id="ui-flags" class="sidebar-val">00</div>
+                <div class="sidebar-hint"><b>ЛКМ</b> - ЧИСТИТЬ</div>
+            </div>
+
+            <div id="board-frame">
+                <div id="grid"></div>
+            </div>
+
+            <div class="sidebar-panel">
+                <span class="sidebar-label">ТАЙМЕР</span>
+                <div id="ui-timer" class="sidebar-val">000</div>
+                <div class="sidebar-hint"><b>ПКМ</b> - МЕТКА</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="finish-overlay">
+        <div class="finish-card">
+            <h2 id="finish-status" class="finish-title">BOOM!</h2>
+            <div class="btn-row">
+                <button class="btn-street" onclick="App.reset()">ЕЩЕ РАЗ</button>
+                <button class="btn-street" onclick="App.exit()">ВЫХОД</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SAPER STREET ENGINE v3.0
+         * Уличный стиль, чистая логика
+         */
+        const App = {
+            levels: {
+                easy:   { r: 9,  c: 9,  m: 10 },
+                medium: { r: 16, c: 16, m: 40 },
+                hard:   { r: 16, c: 30, m: 99 }
+            },
+
+            state: {
+                currentLevel: 'hard',
+                rows: 0,
+                cols: 0,
+                mines: 0,
+                grid: [],
+                flags: 0,
+                active: false,
+                first: true,
+                time: 0,
+                timerId: null
+            },
+
+            // Вход в игру
+            start(lv) {
+                this.state.currentLevel = lv;
+                const s = this.levels[lv];
+                this.state.rows = s.r;
+                this.state.cols = s.c;
+                this.state.mines = s.m;
+
+                document.getElementById('menu-screen').classList.add('hide');
+                document.getElementById('game-screen').style.display = 'flex';
+                
+                this.reset();
+            },
+
+            // Рестарт (Еще раз)
+            reset() {
+                this.stopTimer();
+                this.state.time = 0;
+                this.state.flags = 0;
+                this.state.first = true;
+                this.state.active = true;
+                this.state.grid = [];
+
+                document.getElementById('finish-overlay').style.display = 'none';
+                document.getElementById('ui-timer').innerText = '000';
+                this.updateUI();
+                this.buildGrid();
+            },
+
+            // Сборка поля
+            buildGrid() {
+                const dom = document.getElementById('grid');
+                dom.innerHTML = '';
+                dom.style.gridTemplateColumns = `repeat(${this.state.cols}, 32px)`;
+
+                for (let r = 0; r < this.state.rows; r++) {
+                    this.state.grid[r] = [];
+                    for (let c = 0; c < this.state.cols; c++) {
+                        const tile = document.createElement('div');
+                        tile.className = 'cell';
+                        
+                        tile.onmousedown = (e) => {
+                            if (e.button === 0) this.handleLeft(r, c);
+                            if (e.button === 2) this.handleRight(r, c);
+                        };
+
+                        dom.appendChild(tile);
+
+                        this.state.grid[r][c] = {
+                            isMine: false,
+                            isOpen: false,
+                            isFlagged: false,
+                            val: 0,
+                            dom: tile
+                        };
+                    }
+                }
+            },
+
+            // Генерация после 1-го клика
+            generate(exR, exC) {
+                let m = 0;
+                while (m < this.state.mines) {
+                    let r = Math.floor(Math.random() * this.state.rows);
+                    let c = Math.floor(Math.random() * this.state.cols);
+
+                    if (!this.state.grid[r][c].isMine && (Math.abs(r - exR) > 1 || Math.abs(c - exC) > 1)) {
+                        this.state.grid[r][c].isMine = true;
+                        m++;
+                    }
+                }
+
+                // Расчет цифр
+                for (let r = 0; r < this.state.rows; r++) {
+                    for (let c = 0; c < this.state.cols; c++) {
+                        if (!this.state.grid[r][c].isMine) {
+                            this.state.grid[r][c].val = this.countNear(r, c);
+                        }
+                    }
+                }
+            },
+
+            countNear(r, c) {
+                let n = 0;
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        let nr = r + i, nc = c + j;
+                        if (nr >= 0 && nr < this.state.rows && nc >= 0 && nc < this.state.cols) {
+                            if (this.state.grid[nr][nc].isMine) n++;
+                        }
+                    }
+                }
+                return n;
+            },
+
+            handleLeft(r, c) {
+                if (!this.state.active) return;
+                const tile = this.state.grid[r][c];
+                if (tile.isOpen || tile.isFlagged) return;
+
+                if (this.state.first) {
+                    this.state.first = false;
+                    this.generate(r, c);
+                    this.startTimer();
+                }
+
+                if (tile.isMine) {
+                    this.gameOver(false);
+                    return;
+                }
+
+                this.open(r, c);
+                this.checkWin();
+            },
+
+            handleRight(r, c) {
+                if (!this.state.active) return;
+                const tile = this.state.grid[r][c];
+                if (tile.isOpen) return;
+
+                tile.isFlagged = !tile.isFlagged;
+                tile.dom.classList.toggle('flag');
+                this.state.flags += tile.isFlagged ? 1 : -1;
+                this.updateUI();
+            },
+
+            open(r, c) {
+                const tile = this.state.grid[r][c];
+                if (tile.isOpen || tile.isFlagged) return;
+
+                tile.isOpen = true;
+                tile.dom.classList.add('open');
+
+                if (tile.val > 0) {
+                    tile.dom.innerText = tile.val;
+                    tile.dom.classList.add('n' + tile.val);
+                } else {
+                    for (let i = -1; i <= 1; i++) {
+                        for (let j = -1; j <= 1; j++) {
+                            let nr = r + i, nc = c + j;
+                            if (nr >= 0 && nr < this.state.rows && nc >= 0 && nc < this.state.cols) {
+                                this.open(nr, nc);
+                            }
+                        }
+                    }
+                }
+            },
+
+            startTimer() {
+                this.state.timerId = setInterval(() => {
+                    this.state.time++;
+                    document.getElementById('ui-timer').innerText = 
+                        String(this.state.time).padStart(3, '0');
+                }, 1000);
+            },
+
+            stopTimer() {
+                clearInterval(this.state.timerId);
+            },
+
+            updateUI() {
+                const rem = this.state.mines - this.state.flags;
+                document.getElementById('ui-flags').innerText = rem;
+            },
+
+            checkWin() {
+                let closed = 0;
+                this.state.grid.forEach(row => row.forEach(t => {
+                    if (!t.isOpen) closed++;
+                }));
+                if (closed === this.state.mines) this.gameOver(true);
+            },
+
+            gameOver(win) {
+                this.state.active = false;
+                this.stopTimer();
+
+                this.state.grid.forEach(row => row.forEach(t => {
+                    if (t.isMine) {
+                        t.dom.classList.add('mine');
+                        t.dom.innerText = 'X';
+                    }
+                }));
+
+                const overlay = document.getElementById('finish-overlay');
+                const title = document.getElementById('finish-status');
+                title.innerText = win ? "КРАСАВА!" : "ПОДОРВАН!";
+                title.style.color = win ? "var(--acid-green)" : "var(--blood-red)";
+                
+                setTimeout(() => {
+                    overlay.style.display = 'flex';
+                }, 800);
+            },
+
+            exit() {
+                this.stopTimer();
+                document.getElementById('finish-overlay').style.display = 'none';
+                document.getElementById('game-screen').style.display = 'none';
+                document.getElementById('menu-screen').classList.remove('hide');
+            }
+        };
+
+        // Убираем контекстное меню
+        window.oncontextmenu = (e) => e.preventDefault();
+    </script>
+</body>
+</html>

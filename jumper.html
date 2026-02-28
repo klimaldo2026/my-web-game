@@ -1,0 +1,531 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jumper: Multiverse Heroes PRO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* ОСНОВНОЙ ДИЗАЙН СТРАНИЦЫ */
+        body { 
+            margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; 
+            height: 100vh; background: radial-gradient(circle, #1a1a1a, #000); 
+            color: white; font-family: 'Orbitron', sans-serif; overflow: hidden; 
+        }
+
+        #game-wrapper { position: relative; width: 550px; height: 650px; }
+
+        canvas { 
+            background: #fff; border: 8px solid #333; display: block; 
+            box-shadow: 0 0 40px rgba(0, 255, 200, 0.2); border-radius: 10px; 
+        }
+
+        /* ИНТЕРФЕЙС И МЕНЮ */
+        .ui-screen { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.94); display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; z-index: 100; text-align: center;
+        }
+
+        h1 { 
+            font-family: 'Permanent Marker', cursive; font-size: 80px; color: #fff; 
+            margin: 0; text-shadow: 6px 6px 0 #ff0055; transform: rotate(-1deg); 
+        }
+
+        .menu-btns { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; }
+
+        button { 
+            font-family: 'Permanent Marker', cursive; font-size: 28px; padding: 12px 50px; 
+            background: #ff0055; color: white; border: none; cursor: pointer; border-radius: 5px; 
+            transition: 0.2s; box-shadow: 0 5px 0 #80002b; min-width: 250px;
+        }
+
+        button:hover { transform: scale(1.05); background: #ff3377; }
+        button:active { transform: translateY(3px); box-shadow: 0 2px 0 #80002b; }
+
+        /* МАГАЗИН СКИНОВ */
+        #skin-selector { padding: 20px; box-sizing: border-box; }
+        .skin-list { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; 
+            width: 100%; margin: 20px 0; max-height: 380px; overflow-y: auto; 
+        }
+        .skin-box { 
+            background: #111; border: 3px solid #444; border-radius: 8px; 
+            padding: 10px; cursor: pointer; transition: 0.2s; 
+        }
+        .skin-box:hover { border-color: #ff0055; }
+        .skin-box.active { border-color: #00ffcc; background: #002b22; }
+        .skin-label { font-size: 14px; margin-top: 5px; color: #ccc; }
+
+        /* ИГРОВОЙ ИНТЕРФЕЙС (SCORE И КНОПКА НАЗАД) */
+        #game-ui-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; 
+            display: flex; justify-content: space-between; align-items: flex-start;
+            padding: 20px; box-sizing: border-box; pointer-events: none; z-index: 50;
+        }
+        
+        #score-board { 
+            background: rgba(0,0,0,0.8); padding: 8px 20px; 
+            border-left: 5px solid #ff0055; color: #00ffcc; 
+            font-weight: bold; border-radius: 0 5px 5px 0;
+        }
+
+        .ingame-back-btn {
+            pointer-events: auto; background: #333; color: white;
+            font-family: 'Permanent Marker', cursive; font-size: 18px;
+            padding: 5px 20px; border: none; cursor: pointer; border-radius: 5px;
+            box-shadow: 0 3px 0 #000; transition: 0.2s; min-width: auto;
+        }
+        .ingame-back-btn:hover { background: #ff0055; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="game-ui-overlay" class="hidden">
+        <div id="score-board">HEIGHT: 0000</div>
+        <button class="ingame-back-btn" onclick="quitToMenu()">BACK</button>
+    </div>
+
+    <canvas id="gameCanvas" width="550" height="650"></canvas>
+    
+    <div id="main-menu" class="ui-screen">
+        <h1>JUMPER</h1>
+        <div class="menu-btns">
+            <button onclick="launchGame()">PLAY GAME</button>
+            <button onclick="showSkins()">HEROES</button>
+        </div>
+    </div>
+
+    <div id="skin-menu" class="ui-screen hidden">
+        <h1 style="font-size: 40px;">CHOOSE YOUR HERO</h1>
+        <div class="skin-list" id="skin-container"></div>
+        <button onclick="backToMenu()">BACK</button>
+    </div>
+
+    <div id="death-screen" class="ui-screen hidden">
+        <h1>WASTED</h1>
+        <div id="final-stats" style="font-size: 30px; color: #ff0055; margin: 15px 0;">HEIGHT: 0</div>
+        <div class="menu-btns">
+            <button onclick="launchGame()">RETRY</button>
+            <button onclick="backToMenu()">MAIN MENU</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * ДАННЫЕ СКИНОВ (Конфигурация)
+ */
+const HEROES = {
+    RAPPER: { id: 'RAPPER', name: 'Rapper', body: '#000', head: '#000', secondary: 'gold', cap: '#ff0055' },
+    TYCOON: { id: 'TYCOON', name: 'Rich Guy', body: '#1a1a1a', head: '#ffe0bd', secondary: 'red', cap: '#222' },
+    POLICE: { id: 'POLICE', name: 'Officer', body: '#0d47a1', head: '#ffe0bd', secondary: 'gold', cap: '#0d47a1' },
+    INVINCIBLE: { id: 'INVINCIBLE', name: 'Invincible', body: '#000', head: '#ffe0bd', secondary: '#2980b9', cap: '#f1c40f' },
+    OMNIMAN: { id: 'OMNIMAN', name: 'Omni-Man', body: '#c0392b', head: '#ffe0bd', secondary: '#fff', cap: '#7f8c8d' }
+};
+
+/**
+ * ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ИГРЫ
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let currentHero = HEROES.RAPPER;
+let gameActive = false;
+let player, platforms, items, particles, heightScore, keys = {};
+let lastItemHeight = 0;
+let deathYLimit = 0;
+let frameCount = 0;
+
+/**
+ * ФУНКЦИЯ ОТРИСОВКИ ГЕРОЕВ (Многоуровневая детализация)
+ */
+function drawCharacter(targetCtx, char, skin, xOff, yOff, scale = 1) {
+    targetCtx.save();
+    targetCtx.translate(char.x + char.w / 2 + xOff, char.y + char.h / 2 + yOff);
+    if (char.lookingLeft) targetCtx.scale(-1 * scale, 1 * scale);
+    else targetCtx.scale(scale, scale);
+
+    const s = skin;
+    const isINV = s.id === 'INVINCIBLE';
+
+    // --- ОМНИМЕН: ПЛАЩ (Центрирован и светлее) ---
+    if (s.id === 'OMNIMAN') {
+        targetCtx.fillStyle = '#e74c3c'; 
+        targetCtx.beginPath();
+        targetCtx.moveTo(0, 5);
+        targetCtx.lineTo(-20, 45); 
+        targetCtx.lineTo(20, 45); 
+        targetCtx.fill();
+    }
+
+    // --- ТЕЛО (Основной контур позвоночника) ---
+    targetCtx.strokeStyle = s.body;
+    targetCtx.lineWidth = (s.id === 'OMNIMAN') ? 6 : 4;
+    targetCtx.lineCap = "round";
+    targetCtx.beginPath();
+    targetCtx.moveTo(0, -10); targetCtx.lineTo(0, 18);
+    targetCtx.stroke();
+
+    // --- РУКИ И НОГИ (Базовая геометрия) ---
+    targetCtx.beginPath();
+    targetCtx.moveTo(0, 18); targetCtx.lineTo(-12, 35); // Левая нога
+    targetCtx.moveTo(0, 18); targetCtx.lineTo(12, 35); // Правая нога
+    targetCtx.moveTo(0, 5); targetCtx.lineTo(-18, 15); // Левая рука
+    targetCtx.moveTo(0, 5); targetCtx.lineTo(18, 15); // Правая рука
+    targetCtx.stroke();
+
+    // --- ДЕТАЛИЗАЦИЯ НЕУЯЗВИМОГО (Invincible) ---
+    if (isINV) {
+        // Синие нижние части ног (голени)
+        targetCtx.strokeStyle = "#2980b9";
+        targetCtx.lineWidth = 4;
+        targetCtx.beginPath();
+        targetCtx.moveTo(-6, 26.5); targetCtx.lineTo(-12, 35);
+        targetCtx.moveTo(6, 26.5); targetCtx.lineTo(12, 35);
+        targetCtx.stroke();
+
+        // Желтые нижние части рук (предплечья)
+        targetCtx.strokeStyle = "#f1c40f";
+        targetCtx.lineWidth = 4;
+        targetCtx.beginPath();
+        targetCtx.moveTo(-9, 10); targetCtx.lineTo(-18, 15);
+        targetCtx.moveTo(9, 10); targetCtx.lineTo(18, 15);
+        targetCtx.stroke();
+
+        // Желтый пресс
+        targetCtx.fillStyle = "#f1c40f";
+        targetCtx.fillRect(-4, 0, 8, 18);
+    }
+
+    // --- ОМНИМЕН: БЕЛАЯ ЛИНИЯ КОСТЮМА ---
+    if (s.id === 'OMNIMAN') {
+        targetCtx.strokeStyle = "#ffffff";
+        targetCtx.lineWidth = 3;
+        targetCtx.beginPath();
+        targetCtx.moveTo(0, -5); targetCtx.lineTo(0, 15);
+        targetCtx.stroke();
+    }
+
+    // --- МАГНАТ: ГАЛСТУК ---
+    if (s.id === 'TYCOON') {
+        targetCtx.fillStyle = "red";
+        targetCtx.beginPath();
+        targetCtx.moveTo(0, 0); targetCtx.lineTo(-3, 12); targetCtx.lineTo(3, 12);
+        targetCtx.fill();
+    }
+
+    // --- ПОЛИЦИЯ: ЗНАЧОК ---
+    if (s.id === 'POLICE') {
+        targetCtx.fillStyle = "gold";
+        targetCtx.beginPath(); targetCtx.arc(5, 5, 3, 0, 6.28); targetCtx.fill();
+    }
+
+    // --- ГОЛОВА (Общий круг) ---
+    targetCtx.beginPath();
+    targetCtx.arc(0, -22, 11, 0, Math.PI * 2);
+    targetCtx.fillStyle = s.head;
+    targetCtx.fill();
+
+    // --- ГОЛОВА НЕУЯЗВИМОГО (Invincible Head Layering) ---
+    if (isINV) {
+        // Черные волосы сверху
+        targetCtx.fillStyle = "#000";
+        targetCtx.fillRect(-10, -32, 20, 8);
+
+        // Желтая маска посередине
+        targetCtx.fillStyle = "#f1c40f";
+        targetCtx.fillRect(-11, -24, 22, 12);
+
+        // Кожа (рот и нос) снизу желтой маски
+        targetCtx.fillStyle = s.head;
+        targetCtx.fillRect(-8, -12, 16, 8);
+
+        // Горизонтальные овальные очки (бело-серые)
+        targetCtx.fillStyle = "#d1d1d1";
+        targetCtx.beginPath(); 
+        targetCtx.ellipse(-4, -18, 5, 3, 0, 0, 7); 
+        targetCtx.ellipse(4, -18, 5, 3, 0, 0, 7); 
+        targetCtx.fill();
+    }
+
+    // --- ВОЛОСЫ И УСЫ ОМНИМЕНА ---
+    if (s.id === 'OMNIMAN') {
+        targetCtx.fillStyle = "white"; targetCtx.fillRect(-10, -35, 20, 10);
+        targetCtx.fillStyle = "black"; targetCtx.fillRect(-6, -20, 12, 4);
+    }
+    
+    // --- АКСЕССУАРЫ ОСТАЛЬНЫХ ---
+    if (s.id === 'RAPPER') {
+        targetCtx.fillStyle = s.cap; targetCtx.fillRect(-10, -32, 20, 7); targetCtx.fillRect(0, -32, 18, 3);
+        targetCtx.strokeStyle = "gold"; targetCtx.lineWidth = 2;
+        targetCtx.beginPath(); targetCtx.arc(0, -12, 8, 0.3, Math.PI - 0.3); targetCtx.stroke();
+    }
+    if (s.id === 'POLICE') {
+        targetCtx.fillStyle = s.cap; targetCtx.fillRect(-12, -34, 24, 8);
+        targetCtx.fillStyle = "gold"; targetCtx.fillRect(-2, -32, 4, 3);
+    }
+
+    targetCtx.restore();
+}
+
+/**
+ * СИСТЕМА ЧАСТИЦ (Эффекты прыжков и ракет)
+ */
+class Effect {
+    constructor(x, y, char, color) {
+        this.x = x; this.y = y; this.char = char; this.color = color;
+        this.vx = (Math.random() - 0.5) * 6;
+        this.vy = (Math.random() - 1) * 6;
+        this.alpha = 1;
+        this.size = 14 + Math.random() * 8;
+    }
+    update() { this.x += this.vx; this.y += this.vy; this.alpha -= 0.02; }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.font = `bold ${this.size}px Arial`;
+        ctx.fillText(this.char, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+/**
+ * ГЕНЕРАЦИЯ ПЛАТФОРМ
+ */
+function createPlatform(y, isStatic = false) {
+    let w = Math.max(70, 110 - (heightScore / 1500));
+    let type = 'normal';
+    if (!isStatic) {
+        let r = Math.random();
+        if (heightScore > 500 && r < 0.4) type = 'moving';
+        else if (heightScore > 1500 && r < 0.6) type = 'cracked';
+    }
+
+    let hasItem = null;
+    if (heightScore - lastItemHeight > 250) {
+        let ir = Math.random();
+        if (ir > 0.8) { hasItem = 'spring'; lastItemHeight = heightScore; }
+        else if (ir > 0.65) { hasItem = 'rocket'; lastItemHeight = heightScore; }
+    }
+
+    platforms.push({
+        x: Math.random() * (canvas.width - w),
+        y: y, w: w, h: 18, type: type,
+        item: hasItem, dir: 1, speed: 1.4 + (heightScore / 4000)
+    });
+
+    if (heightScore > 1000 && Math.random() < 0.25) {
+        platforms.push({ x: Math.random() * (canvas.width - 80), y: y - 60, w: 80, h: 15, type: 'spiky' });
+    }
+}
+
+/**
+ * ОСНОВНАЯ ЛОГИКА ИГРЫ
+ */
+function launchGame() {
+    hideAllScreens();
+    document.getElementById('game-ui-overlay').classList.remove('hidden');
+    
+    heightScore = 0; platforms = []; particles = []; lastItemHeight = 0;
+    let startY = 600;
+    
+    platforms.push({ x: canvas.width/2 - 75, y: startY, w: 150, h: 22, type: 'normal' });
+    for (let i = 1; i < 15; i++) createPlatform(startY - (i * 75), i < 8);
+
+    player = {
+        x: canvas.width/2 - 20, y: startY - 80, w: 40, h: 65,
+        vx: 0, vy: 0, gravity: 0.46, jump: -12.5,
+        rocket: 0, lookingLeft: false, fallingFast: false
+    };
+
+    gameActive = true;
+}
+
+function updateLogic() {
+    if (!gameActive) return;
+
+    // Горизонтальное движение
+    let moveDir = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) { moveDir = -6; player.lookingLeft = true; }
+    if (keys['ArrowRight'] || keys['KeyD']) { moveDir = 6; player.lookingLeft = false; }
+    player.vx += (moveDir - player.vx) * 0.2;
+    player.x += player.vx;
+
+    // Границы экрана
+    if (player.x > canvas.width) player.x = -player.w;
+    if (player.x < -player.w) player.x = canvas.width;
+
+    // Вертикальное движение
+    if (player.rocket > 0) {
+        player.vy = -15; player.rocket--;
+        if (frameCount % 4 === 0) particles.push(new Effect(player.x+15, player.y+60, "🔥", "#ffaa00"));
+    } else {
+        player.vy += player.gravity;
+    }
+    player.y += player.vy;
+
+    // Коллизии с платформами
+    if (player.vy > 0) {
+        let landed = false;
+        platforms.forEach((p, idx) => {
+            if (player.x + 12 < p.x + p.w && player.x + player.w - 12 > p.x &&
+                player.y + player.h < p.y + p.h && player.y + player.h > p.y - 12) {
+                
+                if (p.type === 'spiky') { gameOver(); return; }
+                
+                landed = true;
+                player.fallingFast = false;
+
+                if (currentHero.id === 'TYCOON') {
+                    for(let m=0; m<3; m++) particles.push(new Effect(player.x+15, player.y+50, "$", "#2ecc71"));
+                }
+
+                if (p.type === 'cracked') platforms.splice(idx, 1);
+                if (p.item === 'spring') player.vy = -26;
+                else if (p.item === 'rocket') player.rocket = 150;
+                else player.vy = player.jump;
+            }
+        });
+
+        // Детектор падения
+        if (!landed && player.y > canvas.height - 40 && !player.fallingFast) {
+            player.fallingFast = true;
+            deathYLimit = player.y + 160;
+        }
+    }
+
+    // Движение камеры (скроллинг)
+    if (player.y < canvas.height / 3) {
+        let diff = canvas.height / 3 - player.y;
+        player.y = canvas.height / 3;
+        heightScore += Math.floor(diff / 6);
+        document.getElementById('score-board').innerText = "HEIGHT: " + heightScore.toString().padStart(4, '0');
+        platforms.forEach(p => p.y += diff);
+        if (player.fallingFast) deathYLimit += diff;
+    }
+
+    // Регенерация платформ
+    platforms = platforms.filter(p => p.y < canvas.height + 100);
+    while (platforms.length < 16) {
+        let topY = Math.min(...platforms.map(p => p.y));
+        createPlatform(topY - 80);
+    }
+
+    // Движущиеся платформы
+    platforms.forEach(p => {
+        if (p.type === 'moving') {
+            p.x += p.speed * p.dir;
+            if (p.x <= 0 || p.x + p.w >= canvas.width) p.dir *= -1;
+        }
+    });
+
+    particles.forEach((p, i) => { p.update(); if (p.alpha <= 0) particles.splice(i, 1); });
+
+    if (player.y > canvas.height || (player.fallingFast && player.y > deathYLimit)) gameOver();
+    frameCount++;
+}
+
+function renderFrame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Сетка фона
+    ctx.strokeStyle = "#f3f3f3"; ctx.lineWidth = 1;
+    for(let i=0; i<canvas.height; i+=50) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
+    for(let j=0; j<canvas.width; j+=50) { ctx.beginPath(); ctx.moveTo(j, 0); ctx.lineTo(j, canvas.height); ctx.stroke(); }
+
+    if (!gameActive) return;
+
+    // Рисуем платформы
+    platforms.forEach(p => {
+        if (p.type === 'spiky') {
+            ctx.fillStyle = "#2c3e50"; ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.fillStyle = "#e74c3c";
+            for (let s = 0; s < p.w; s += 16) {
+                ctx.beginPath(); ctx.moveTo(p.x+s, p.y); ctx.lineTo(p.x+s+8, p.y-14); ctx.lineTo(p.x+s+16, p.y); ctx.fill();
+            }
+        } else {
+            ctx.fillStyle = p.type === 'cracked' ? "#bdc3c7" : (p.type === 'moving' ? "#34495e" : "#ff0055");
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(p.x, p.y, p.w, 4);
+
+            if (p.item === 'spring') {
+                ctx.strokeStyle = "#444"; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(p.x+p.w/2, p.y-8, 10, 0, Math.PI, true); ctx.stroke();
+            } else if (p.item === 'rocket') {
+                ctx.fillStyle = "#3498db"; ctx.fillRect(p.x+p.w/2-8, p.y-25, 16, 25);
+            }
+        }
+    });
+
+    particles.forEach(p => p.draw());
+    drawCharacter(ctx, player, currentHero, 0, 0);
+}
+
+/**
+ * ИНТЕРФЕЙС И УПРАВЛЕНИЕ ЭКРАНАМИ
+ */
+function showSkins() {
+    hideAllScreens();
+    document.getElementById('skin-menu').classList.remove('hidden');
+    const container = document.getElementById('skin-container');
+    container.innerHTML = '';
+    
+    Object.values(HEROES).forEach(h => {
+        const box = document.createElement('div');
+        box.className = `skin-box ${currentHero.id === h.id ? 'active' : ''}`;
+        
+        const preview = document.createElement('canvas');
+        preview.width = 60; preview.height = 80;
+        const pCtx = preview.getContext('2d');
+        
+        drawCharacter(pCtx, {x:5, y:5, w:40, h:65, lookingLeft: false}, h, -5, -5, 0.8);
+        
+        box.innerHTML = `<div class="skin-label">${h.name}</div>`;
+        box.prepend(preview);
+        box.onclick = () => { currentHero = h; showSkins(); };
+        container.appendChild(box);
+    });
+}
+
+function quitToMenu() {
+    gameActive = false;
+    hideAllScreens();
+    document.getElementById('main-menu').classList.remove('hidden');
+}
+
+function gameOver() {
+    gameActive = false;
+    document.getElementById('game-ui-overlay').classList.add('hidden');
+    document.getElementById('death-screen').classList.remove('hidden');
+    document.getElementById('final-stats').innerText = "HEIGHT: " + heightScore;
+}
+
+function backToMenu() { 
+    hideAllScreens(); 
+    document.getElementById('main-menu').classList.remove('hidden'); 
+}
+
+function hideAllScreens() { 
+    document.querySelectorAll('.ui-screen').forEach(m => m.classList.add('hidden')); 
+    document.getElementById('game-ui-overlay').classList.add('hidden');
+}
+
+// Слушатели ввода
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// Двигатель игры
+function gameLoop() {
+    updateLogic();
+    renderFrame();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>

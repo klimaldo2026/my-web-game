@@ -1,0 +1,557 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNAKE NEON: РЕЛИЗ 500</title>
+    <style>
+        /* ============================================================
+           1. ГЛОБАЛЬНЫЕ НЕОНОВЫЕ СТИЛИ (CSS)
+           ============================================================
+        */
+        
+        :root {
+            --neon-cyan: #0ff;
+            --neon-pink: #f0f;
+            --neon-yellow: #ff0;
+            --bg-dark: #000;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-weight: 900;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* СЕКРЕТНЫЕ КНОПКИ BOOM / POW 
+           z-index: 9999 гарантирует, что они всегда кликабельны
+        */
+        .secret-label {
+            position: absolute;
+            font-size: 55px;
+            cursor: pointer;
+            z-index: 9999; 
+            text-transform: uppercase;
+            text-shadow: 
+                0 0 10px #fff,
+                0 0 20px var(--neon-pink), 
+                0 0 40px var(--neon-cyan);
+            transition: transform 0.1s ease;
+        }
+        
+        .secret-label:active {
+            transform: scale(0.7);
+            opacity: 0.5;
+        }
+
+        /* ЦЕНТРАЛЬНЫЙ КОНТЕЙНЕР ДЛЯ МЕНЮ
+        */
+        .ui-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 80px;
+            margin-bottom: 30px;
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px #fff, 0 0 40px var(--neon-pink), 0 0 60px var(--neon-cyan);
+        }
+
+        /* КНОПКИ ИНТЕРФЕЙСА 
+        */
+        .btn {
+            background: transparent;
+            color: #fff;
+            border: 3px solid #fff;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin: 10px;
+            min-width: 280px;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px var(--neon-pink), inset 0 0 5px var(--neon-pink);
+        }
+
+        .btn:hover {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 30px var(--neon-cyan), 0 0 10px #fff;
+            transform: scale(1.05);
+        }
+
+        .btn-active {
+            background: #fff !important;
+            color: #000 !important;
+            box-shadow: 0 0 30px var(--neon-cyan) !important;
+        }
+
+        .hidden { display: none !important; }
+
+        /* СПЕЦИАЛЬНОЕ ОКНО ПОЗДРАВЛЕНИЯ 
+        */
+        #congrats-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 10px double var(--neon-cyan);
+        }
+
+        /* ИГРОВАЯ ЗОНА 
+        */
+        #game-area {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            background: #000;
+            border: 8px solid #fff;
+            box-shadow: 0 0 30px var(--neon-pink), inset 0 0 15px var(--neon-cyan);
+        }
+
+        .stats {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            font-size: 24px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+        }
+
+        #game-over-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        /* ЧАСТИЦЫ LOL */
+        .lol-pop {
+            position: absolute;
+            color: #fff;
+            font-size: 32px;
+            font-weight: 800;
+            text-shadow: 0 0 10px var(--neon-pink);
+            pointer-events: none;
+            z-index: 10000;
+            animation: lol-fly 0.8s forwards ease-out;
+        }
+
+        @keyframes lol-fly {
+            0% { opacity: 1; transform: translate(0,0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(2); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="boom-btn" class="secret-label" style="top:40px; left:40px;" onclick="handleSecretClick()">BOOM!</div>
+    <div id="pow-btn" class="secret-label" style="bottom:40px; right:40px;" onclick="handleSecretClick()">POW!</div>
+
+    <div id="congrats-modal" class="hidden">
+        <h2 style="font-size: 50px; color: var(--neon-yellow);">СЕКРЕТ ОТКРЫТ!</h2>
+        <p style="font-size: 20px; max-width: 600px; text-align: center; line-height: 1.6;">
+            Вы получили доступ к протоколу <b>«СЛУЧАЙНЫЙ ПИВОТ»</b>.<br><br>
+            В этом режиме змейка при поедании еды меняет направление головы и хвоста, совершая случайный поворот на 90 градусов. Стены теперь проходимы.
+        </p>
+        <button class="btn" onclick="closeCongrats()">АКТИВИРОВАТЬ</button>
+    </div>
+
+    <div id="menu-view" class="ui-screen">
+        <h1>ЗМЕЙКА</h1>
+        <button class="btn" onclick="startGame()">ИГРАТЬ</button>
+        <button class="btn" onclick="changeView('modes-view')">РЕЖИМЫ</button>
+        <div style="margin-top: 20px; color: #555;">РЕЖИМ: <span id="cur-mode-name" style="color: var(--neon-cyan);">КЛАССИКА</span></div>
+    </div>
+
+    <div id="modes-view" class="ui-screen hidden">
+        <h1 style="font-size: 40px;">РЕЖИМЫ</h1>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; max-width: 700px;">
+            <button id="m-classic" class="btn btn-active" style="min-width: 200px;" onclick="setMode('classic')">КЛАССИКА</button>
+            <button id="m-tank" class="btn" style="min-width: 200px;" onclick="setMode('tank')">ТАНК</button>
+            <button id="m-mega" class="btn" style="min-width: 200px;" onclick="setMode('mega')">МЕГА ЕДА</button>
+            <button id="m-portals" class="btn" style="min-width: 200px;" onclick="setMode('portals')">ПОРТАЛЫ</button>
+            <button id="m-secret" class="btn hidden" style="min-width: 200px; border-color: var(--neon-cyan);" onclick="setMode('secret')">СЕКРЕТ</button>
+        </div>
+        <button class="btn" style="border-color: #444; margin-top: 30px;" onclick="changeView('menu-view')">НАЗАД</button>
+    </div>
+
+    <div id="game-view" class="ui-screen hidden">
+        <div id="game-area">
+            <div class="stats">
+                <div>СЧЕТ: <span id="score-val">0</span></div>
+                <div id="mode-val" style="color: var(--neon-pink);">КЛАССИКА</div>
+            </div>
+            <canvas id="snakeCanvas" width="600" height="400"></canvas>
+            
+            <div id="game-over-layer" class="hidden">
+                <h2 style="font-size: 50px; color: #f00;">ИГРА ОКОНЧЕНА</h2>
+                <button class="btn" onclick="startGame()">ЗАНОВО</button>
+                <button class="btn" onclick="exitToMenu()">В МЕНЮ</button>
+            </div>
+            
+            <button class="btn" style="width: 150px; padding: 10px; font-size: 14px; margin-top: 20px;" onclick="exitToMenu()">ВЫХОД</button>
+        </div>
+    </div>
+
+    <script>
+        /* ============================================================
+           2. ЛОГИКА ИГРЫ (JAVASCRIPT)
+           ============================================================
+        */
+
+        const canvas = document.getElementById("snakeCanvas");
+        const ctx = canvas.getContext("2d");
+        const box = 25;
+
+        let active = false;
+        let score = 0;
+        let snake = [];
+        let foodItems = [];
+        let dir = "RIGHT";
+        let nextDir = "RIGHT";
+        let gameLoop;
+        
+        let currentMode = 'classic';
+        let portals = [];
+
+        // Переменные пасхалки
+        let secretClicks = 0;
+        let isSecretFound = false;
+
+        /**
+         * КЛИКИ ПО БУМ И ПОВ
+         */
+        function handleSecretClick() {
+            secretClicks++;
+            
+            // От 10 до 25 кликов - спам LOL
+            if (secretClicks >= 10 && secretClicks < 25) {
+                createLol();
+            }
+
+            // На 25 клике открываем доступ
+            if (secretClicks >= 25 && !isSecretFound) {
+                isSecretFound = true;
+                document.getElementById('congrats-modal').classList.remove('hidden');
+                document.getElementById('m-secret').classList.remove('hidden');
+                createLol();
+            }
+        }
+
+        function closeCongrats() {
+            document.getElementById('congrats-modal').classList.add('hidden');
+        }
+
+        /**
+         * ЭФФЕКТ LOL
+         */
+        function createLol() {
+            for(let i=0; i<12; i++) {
+                const div = document.createElement('div');
+                div.className = 'lol-pop';
+                div.innerText = "LOL!";
+                div.style.left = Math.random() * 100 + "vw";
+                div.style.top = Math.random() * 100 + "vh";
+                
+                // Рандомный вектор разлета
+                const vx = (Math.random() - 0.5) * 500;
+                const vy = (Math.random() - 0.5) * 500;
+                div.style.setProperty('--x', vx + 'px');
+                div.style.setProperty('--y', vy + 'px');
+                
+                document.body.appendChild(div);
+                setTimeout(() => div.remove(), 800);
+            }
+        }
+
+        /**
+         * СМЕНА ЭКРАНОВ
+         */
+        function changeView(viewId) {
+            const screens = ['menu-view', 'modes-view', 'game-view'];
+            screens.forEach(s => document.getElementById(s).classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        /**
+         * УСТАНОВКА РЕЖИМА
+         */
+        function setMode(m) {
+            currentMode = m;
+            const titles = {
+                'classic': 'КЛАССИКА',
+                'tank': 'ТАНК',
+                'mega': 'МЕГА ЕДА',
+                'portals': 'ПОРТАЛЫ',
+                'secret': 'СЕКРЕТ'
+            };
+            document.getElementById('cur-mode-name').innerText = titles[m];
+            
+            // Визуальный выбор кнопки
+            const allBtns = document.querySelectorAll('#modes-view .btn');
+            allBtns.forEach(b => b.classList.remove('btn-active'));
+            document.getElementById('m-' + m).classList.add('btn-active');
+        }
+
+        /**
+         * ВЫХОД И СБРОС (ВАЖНО!)
+         */
+        function exitToMenu() {
+            clearInterval(gameLoop);
+            active = false;
+            
+            // Сбрасываем секрет при выходе в главное меню
+            secretClicks = 0;
+            isSecretFound = false;
+            document.getElementById('m-secret').classList.add('hidden');
+            if(currentMode === 'secret') setMode('classic');
+
+            changeView('menu-view');
+        }
+
+        /**
+         * СТАРТ ИГРЫ
+         */
+        function startGame() {
+            changeView('game-view');
+            document.getElementById('game-over-layer').classList.add('hidden');
+            
+            score = 0;
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('mode-val').innerText = document.getElementById('cur-mode-name').innerText;
+
+            dir = "RIGHT";
+            nextDir = "RIGHT";
+
+            // Змейка (3 сегмента)
+            snake = [
+                {x: 10 * box, y: 10 * box},
+                {x: 9 * box, y: 10 * box},
+                {x: 8 * box, y: 10 * box}
+            ];
+
+            // Еда
+            foodItems = [];
+            let count = (currentMode === 'mega') ? 15 : 1;
+            for(let i=0; i<count; i++) foodItems.push(generatePos());
+
+            // Порталы
+            if(currentMode === 'portals') {
+                portals = [
+                    {e1: generatePos(), e2: generatePos(), color: varStr('--neon-cyan')},
+                    {e1: generatePos(), e2: generatePos(), color: varStr('--neon-pink')}
+                ];
+            }
+
+            clearInterval(gameLoop);
+            gameLoop = setInterval(update, 120);
+            active = true;
+        }
+
+        function varStr(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        function generatePos() {
+            return {
+                x: Math.floor(Math.random() * (600/box)) * box,
+                y: Math.floor(Math.random() * (400/box)) * box
+            };
+        }
+
+        /**
+         * УПРАВЛЕНИЕ КЛАВИШАМИ
+         */
+        document.addEventListener("keydown", e => {
+            const k = e.key.toLowerCase();
+            if ((k === "w" || k === "ц" || k === "arrowup") && dir !== "DOWN") nextDir = "UP";
+            else if ((k === "s" || k === "ы" || k === "arrowdown") && dir !== "UP") nextDir = "DOWN";
+            else if ((k === "a" || k === "ф" || k === "arrowleft") && dir !== "RIGHT") nextDir = "LEFT";
+            else if ((k === "d" || k === "в" || k === "arrowright") && dir !== "LEFT") nextDir = "RIGHT";
+        });
+
+        /**
+         * ГЛАВНЫЙ ОБНОВЛЯЕМЫЙ ЦИКЛ
+         */
+        function update() {
+            if(!active) return;
+            dir = nextDir;
+
+            let headX = snake[0].x;
+            let headY = snake[0].y;
+
+            if (dir === "LEFT") headX -= box;
+            else if (dir === "UP") headY -= box;
+            else if (dir === "RIGHT") headX += box;
+            else if (dir === "DOWN") headY += box;
+
+            // Логика порталов
+            if(currentMode === 'portals') {
+                portals.forEach(p => {
+                    if(headX === p.e1.x && headY === p.e1.y) { headX = p.e2.x; headY = p.e2.y; }
+                    else if(headX === p.e2.x && headY === p.e2.y) { headX = p.e1.x; headY = p.e1.y; }
+                });
+            }
+
+            // Прохождение сквозь стены (ТАНК, ПОРТАЛЫ, СЕКРЕТ)
+            const noWalls = (currentMode === 'tank' || currentMode === 'portals' || currentMode === 'secret');
+            if(noWalls) {
+                if(headX < 0) headX = 600 - box;
+                else if(headX >= 600) headX = 0;
+                if(headY < 0) headY = 400 - box;
+                else if(headY >= 400) headY = 0;
+            }
+
+            // Условия поражения
+            const hitWall = (headX < 0 || headX >= 600 || headY < 0 || headY >= 400);
+            const hitSelf = snake.some(s => s.x === headX && s.y === headY);
+
+            if(((currentMode === 'classic' || currentMode === 'mega') && hitWall) || hitSelf) {
+                active = false;
+                document.getElementById('game-over-layer').classList.remove('hidden');
+                clearInterval(gameLoop);
+                return;
+            }
+
+            let newHead = {x: headX, y: headY};
+            let eaten = false;
+
+            // Проверка поедания
+            foodItems.forEach((f, idx) => {
+                if(headX === f.x && headY === f.y) {
+                    score++;
+                    document.getElementById('score-val').innerText = score;
+                    foodItems.splice(idx, 1);
+                    foodItems.push(generatePos());
+                    eaten = true;
+
+                    /* ----------------------------------------------------
+                       СЕКРЕТНАЯ МЕХАНИКА: REVERSE + 50/50 PIVOT
+                       ---------------------------------------------------- */
+                    if(currentMode === 'secret') {
+                        snake.unshift(newHead); 
+                        snake.reverse();        
+                        
+                        // Поворот на 90 градусов (влево или вправо 50/50)
+                        const pivot = Math.random() < 0.5;
+                        
+                        if(dir === "LEFT" || dir === "RIGHT") {
+                            nextDir = pivot ? "UP" : "DOWN";
+                        } else {
+                            nextDir = pivot ? "LEFT" : "RIGHT";
+                        }
+                        eaten = false; 
+                    }
+
+                    // Перемешиваем порталы
+                    if(currentMode === 'portals') {
+                        portals.forEach(p => { p.e1 = generatePos(); p.e2 = generatePos(); });
+                    }
+                }
+            });
+
+            if(!eaten) {
+                snake.pop();
+            }
+            
+            // Если не было секретного переворота, добавляем голову обычно
+            if(currentMode !== 'secret' || !eaten) {
+                snake.unshift(newHead);
+            }
+
+            draw();
+        }
+
+        /**
+         * ОТРИСОВКА ГРАФИКИ
+         */
+        function draw() {
+            // Очистка холста
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Отрисовка сетки
+            ctx.strokeStyle = "#111";
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=box) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for(let j=0; j<canvas.height; j+=box) {
+                ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke();
+            }
+
+            // Еда
+            foodItems.forEach(f => {
+                ctx.fillStyle = "#f00";
+                ctx.shadowBlur = 20; ctx.shadowColor = "#f00";
+                ctx.beginPath();
+                ctx.arc(f.x + box/2, f.y + box/2, box/2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Порталы
+            if(currentMode === 'portals') {
+                portals.forEach(p => {
+                    ctx.fillStyle = p.color;
+                    ctx.shadowBlur = 15; ctx.shadowColor = p.color;
+                    ctx.fillRect(p.e1.x, p.e1.y, box, box);
+                    ctx.fillRect(p.e2.x, p.e2.y, box, box);
+                    ctx.shadowBlur = 0;
+                });
+            }
+
+            // Змейка
+            snake.forEach((s, i) => {
+                ctx.fillStyle = (i === 0) ? varStr('--neon-cyan') : "#fff";
+                if(i === 0) { 
+                    ctx.shadowBlur = 15; ctx.shadowColor = varStr('--neon-cyan'); 
+                }
+                ctx.fillRect(s.x, s.y, box, box);
+                ctx.shadowBlur = 0;
+                
+                ctx.strokeStyle = "#000";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(s.x, s.y, box, box);
+            });
+        }
+    </script>
+</body>
+</html>

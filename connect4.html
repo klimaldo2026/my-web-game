@@ -1,0 +1,329 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ЧЕТЫРЕ В РЯД</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --p1: #ff0055;
+            --p2: #00f2ff;
+            --stroke: #bc13fe;
+            --board: #111;
+            --font: 'Permanent Marker', cursive;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: white;
+            font-family: var(--font);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .street-text {
+            text-shadow: 3px 3px 0px var(--stroke), -1px -1px 0px var(--stroke), 
+                         1px -1px 0px var(--stroke), -1px 1px 0px var(--stroke), 0px 0px 10px var(--stroke);
+            text-transform: uppercase;
+        }
+
+        #menu {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #menu.hidden { display: none !important; }
+        h1 { font-size: clamp(3rem, 12vw, 5rem); margin: 0 0 20px 0; }
+        .menu-btns { display: flex; flex-direction: column; gap: 15px; width: 280px; }
+
+        .btn {
+            padding: 15px;
+            font-family: var(--font);
+            font-size: 1.4rem;
+            background: transparent;
+            color: white;
+            border: 3px solid var(--stroke);
+            cursor: pointer;
+            box-shadow: 4px 4px 0px var(--stroke);
+            transition: 0.1s;
+        }
+
+        .btn:hover { background: var(--stroke); box-shadow: 0 0 20px var(--stroke); transform: translate(-2px, -2px); }
+        .diff-box { display: none; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+        .game-screen { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 450px; }
+        .status { font-size: 1.8rem; margin-bottom: 5px; height: 1.5em; }
+        .scores { display: flex; gap: 30px; margin-bottom: 10px; font-size: 1.4rem; }
+
+        .board {
+            background: var(--board);
+            padding: 8px;
+            border: 4px solid var(--stroke);
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            width: 100%;
+            aspect-ratio: 7/6;
+        }
+
+        .slot { background: #000; border-radius: 50%; cursor: pointer; border: 1px solid #222; position: relative; }
+        .piece {
+            width: 90%; height: 90%; border-radius: 50%; position: absolute; top: 5%; left: 5%;
+            animation: drop 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes drop { 0% { transform: translateY(-400%); } 100% { transform: translateY(0); } }
+        .p1-chip { background: var(--p1); box-shadow: 0 0 10px var(--p1); }
+        .p2-chip { background: var(--p2); box-shadow: 0 0 10px var(--p2); }
+
+        #overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+            z-index: 2000; flex-direction: column; justify-content: center; align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu">
+        <h1 class="street-text">ЧЕТЫРЕ В РЯД</h1>
+        <div class="menu-btns">
+            <button class="btn" onclick="start('pvp')">НА ДВОИХ</button>
+            <button class="btn" onclick="showDiff()">ПРОТИВ БОТА</button>
+            <div id="diff-list" class="diff-box">
+                <button class="btn" onclick="start('pve', 'easy')">ЛЕГКО</button>
+                <button class="btn" onclick="start('pve', 'hard')">СЛОЖНО</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-screen">
+        <div id="status" class="status street-text">ТВОЙ ХОД!</div>
+        <div class="scores">
+            <div>P1: <span id="s1" style="color: var(--p1);">0</span></div>
+            <div>P2: <span id="s2" style="color: var(--p2);">0</span></div>
+        </div>
+        <div class="board" id="board"></div>
+        <div style="margin-top:20px;">
+            <button class="btn" style="width: 250px;" onclick="backToMenu()">НАЗАД В МЕНЮ</button>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <div id="win-msg" class="street-text" style="font-size: 3.5rem; margin-bottom: 30px;">ПОБЕДА!</div>
+        <div class="menu-btns">
+            <button class="btn" onclick="closeOverlay()">ЕЩЕ РАЗ</button>
+            <button class="btn" style="border-color: #555;" onclick="backToMenu()">В МЕНЮ</button>
+        </div>
+    </div>
+
+    <script>
+        const ROWS = 6, COLS = 7;
+        let board = [], turn = 1, active = false, mode = 'pvp', aiLevel = 'hard';
+        let score = { 1: 0, 2: 0 };
+
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        const overlay = document.getElementById('overlay');
+
+        function showDiff() { document.getElementById('diff-list').style.display = 'flex'; }
+
+        function start(m, lvl) {
+            mode = m; aiLevel = lvl;
+            score[1] = 0; score[2] = 0;
+            updateScoreDisplay();
+            document.getElementById('menu').classList.add('hidden');
+            resetGame();
+        }
+
+        function backToMenu() {
+            score[1] = 0; score[2] = 0;
+            updateScoreDisplay();
+            document.getElementById('menu').classList.remove('hidden');
+            document.getElementById('diff-list').style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        function initBoard() {
+            boardEl.innerHTML = '';
+            board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            for (let i = 0; i < ROWS * COLS; i++) {
+                const s = document.createElement('div');
+                s.className = 'slot';
+                const c = i % COLS;
+                s.onclick = () => { if(active && (mode==='pvp' || turn===1)) handleMove(c); };
+                boardEl.appendChild(s);
+            }
+        }
+
+        function handleMove(c) {
+            const r = getRow(board, c);
+            if (r === -1) return;
+            board[r][c] = turn;
+            renderPiece(r, c, turn);
+            if (checkWin(board, turn)) return endGame(turn);
+            if (board.flat().every(v => v !== 0)) return endGame('tie');
+            turn = turn === 1 ? 2 : 1;
+            updateUI();
+            if (mode === 'pve' && turn === 2) setTimeout(botMove, 500);
+        }
+
+        function getRow(b, c) {
+            for (let r = ROWS - 1; r >= 0; r--) if (b[r][c] === 0) return r;
+            return -1;
+        }
+
+        function renderPiece(r, c, p) {
+            const piece = document.createElement('div');
+            piece.className = `piece ${p === 1 ? 'p1-chip' : 'p2-chip'}`;
+            boardEl.children[r * COLS + c].appendChild(piece);
+        }
+
+        function updateUI() {
+            statusEl.innerText = turn === 1 ? "ХОД: КРАСНЫЙ" : "ХОД: ГОЛУБОЙ";
+            statusEl.style.color = turn === 1 ? 'var(--p1)' : 'var(--p2)';
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('s1').innerText = score[1];
+            document.getElementById('s2').innerText = score[2];
+        }
+
+        function checkWin(b, p) {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (b[r][c] !== p) continue;
+                    if (c + 3 < COLS && b[r][c+1] === p && b[r][c+2] === p && b[r][c+3] === p) return true;
+                    if (r + 3 < ROWS) {
+                        if (b[r+1][c] === p && b[r+2][c] === p && b[r+3][c] === p) return true;
+                        if (c + 3 < COLS && b[r+1][c+1] === p && b[r+2][c+2] === p && b[r+3][c+3] === p) return true;
+                        if (c - 3 >= 0 && b[r+1][c-1] === p && b[r+2][c-2] === p && b[r+3][c-3] === p) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function botMove() {
+            if (aiLevel === 'easy') {
+                // Легкий бот: в 90% случаев тыкает наугад, в 10% играет как профи
+                if (Math.random() > 0.1) {
+                    const valid = []; for(let c=0; c<COLS; c++) if(board[0][c]===0) valid.push(c);
+                    return handleMove(valid[Math.floor(Math.random()*valid.length)]);
+                }
+            }
+            
+            // Сложный бот (или "палка" легкого бота)
+            let bestScore = -Infinity;
+            let move = 3;
+            let choices = [];
+            let depth = aiLevel === 'hard' ? 7 : 2;
+
+            for(let c=0; c<COLS; c++) {
+                let r = getRow(board, c);
+                if(r !== -1) {
+                    board[r][c] = 2;
+                    let s = minimax(board, depth, false, -Infinity, Infinity);
+                    board[r][c] = 0;
+                    choices.push({col: c, score: s});
+                }
+            }
+            choices.sort((a,b) => b.score - a.score);
+            handleMove(choices[0].col);
+        }
+
+        function minimax(b, depth, isMax, alpha, beta) {
+            if (checkWin(b, 2)) return 100000 + depth;
+            if (checkWin(b, 1)) return -100000 - depth;
+            if (depth === 0) return evaluate(b);
+
+            if (isMax) {
+                let maxEval = -Infinity;
+                for (let c of [3, 2, 4, 1, 5, 0, 6]) {
+                    let r = getRow(b, c);
+                    if (r !== -1) {
+                        b[r][c] = 2;
+                        let ev = minimax(b, depth - 1, false, alpha, beta);
+                        b[r][c] = 0;
+                        maxEval = Math.max(maxEval, ev);
+                        alpha = Math.max(alpha, ev);
+                        if (beta <= alpha) break;
+                    }
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (let c of [3, 2, 4, 1, 5, 0, 6]) {
+                    let r = getRow(b, c);
+                    if (r !== -1) {
+                        b[r][c] = 1;
+                        let ev = minimax(b, depth - 1, true, alpha, beta);
+                        b[r][c] = 0;
+                        minEval = Math.min(minEval, ev);
+                        beta = Math.min(beta, ev);
+                        if (beta <= alpha) break;
+                    }
+                }
+                return minEval;
+            }
+        }
+
+        function evaluate(b) {
+            let score = 0;
+            const checkSet = (arr) => {
+                let s = 0;
+                let p2 = arr.filter(x => x === 2).length;
+                let p1 = arr.filter(x => x === 1).length;
+                let empty = arr.filter(x => x === 0).length;
+                if (p2 === 3 && empty === 1) s += 50;
+                if (p2 === 2 && empty === 2) s += 5;
+                if (p1 === 3 && empty === 1) s -= 80;
+                return s;
+            };
+            for(let r=0; r<ROWS; r++) if(b[r][3] === 2) score += 6;
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS-3; c++) score += checkSet([b[r][c], b[r][c+1], b[r][c+2], b[r][c+3]]);
+            }
+            for(let c=0; c<COLS; c++) {
+                for(let r=0; r<ROWS-3; r++) score += checkSet([b[r][c], b[r+1][c], b[r+2][c], b[r+3][c]]);
+            }
+            for(let r=0; r<ROWS-3; r++) {
+                for(let c=0; c<COLS-3; c++) score += checkSet([b[r][c], b[r+1][c+1], b[r+2][c+2], b[r+3][c+3]]);
+                for(let c=3; c<COLS; c++) score += checkSet([b[r][c], b[r+1][c-1], b[r+2][c-2], b[r+3][c-3]]);
+            }
+            return score;
+        }
+
+        function endGame(w) {
+            active = false;
+            const msg = document.getElementById('win-msg');
+            if(w==='tie') { msg.innerText = "НИЧЬЯ!"; msg.style.color = "#fff"; } 
+            else {
+                score[w]++;
+                msg.innerText = w === 1 ? "КРАСНЫЙ WIN!" : "ГОЛУБОЙ WIN!";
+                msg.style.color = w === 1 ? 'var(--p1)' : 'var(--p2)';
+            }
+            updateScoreDisplay();
+            setTimeout(() => overlay.style.display = 'flex', 500);
+        }
+
+        function closeOverlay() { overlay.style.display = 'none'; resetGame(); }
+        function resetGame() { active = true; turn = 1; initBoard(); updateUI(); }
+    </script>
+</body>
+</html>

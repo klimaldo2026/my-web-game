@@ -1,0 +1,242 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Street Ball - Smart Bot Edition</title>
+    <style>
+        body { margin: 0; background: #0f0f12; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Courier New', monospace; }
+        #container { position: relative; }
+        canvas { border: 4px solid #222; background: #1e272e; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+        .score { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 60px; font-weight: bold; text-shadow: 4px 4px 0 #d35400; display: flex; gap: 20px; }
+        #menu, #game-over { pointer-events: auto; background: rgba(0,0,0,0.9); width: 100%; height: 100%; z-index: 100; }
+        #game-over { display: none; }
+        .btn { background: #c0392b; color: white; border: none; padding: 15px 40px; font-size: 24px; cursor: pointer; font-family: inherit; margin: 10px; }
+        h1 { color: #fff; font-size: 60px; text-shadow: 4px 4px 0 #c0392b; }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="menu" class="ui-layer">
+            <h1>STREET BALL</h1>
+            <button class="btn" onclick="startGame(1)">1 ИГРОК (STABLE BOT)</button>
+            <button class="btn" onclick="startGame(2)">2 ИГРОКА</button>
+        </div>
+
+        <div id="game-over" class="ui-layer">
+            <h1 id="win-text">ПОБЕДА!</h1>
+            <button class="btn" onclick="backToMenu()">В МЕНЮ</button>
+        </div>
+
+        <div class="score">
+            <span id="s1" style="color: #e74c3c;">0</span>
+            <span>:</span>
+            <span id="s2" style="color: #3498db;">0</span>
+        </div>
+        <canvas id="game"></canvas>
+    </div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 900;
+canvas.height = 450;
+
+const WORLD = { grav: 0.5, fric: 0.97, ground: 380 };
+let scores = [0, 0];
+let gameActive = false;
+let vsBot = false;
+
+class Player {
+    constructor(x, color, isP2) {
+        this.startX = x;
+        this.color = color;
+        this.isP2 = isP2;
+        this.reset();
+    }
+
+    reset() {
+        this.x = this.startX;
+        this.y = WORLD.ground;
+        this.vx = 0; this.vy = 0;
+        this.angle = 0; this.va = 0;
+        this.hasBall = false;
+        this.isGrounded = false;
+        this.pickupTimer = 0;
+    }
+
+    jump() {
+        if (this.isGrounded) { // СТРОГИЙ ЗАПРЕТ НА ДВОЙНОЙ ПРЫЖОК
+            if (this.hasBall) this.throwBall();
+            this.vy = -12.5;
+            this.vx = Math.sin(this.angle) * 13 + (this.isP2 ? -1 : 1);
+            this.va = this.vx * 0.035;
+            this.isGrounded = false;
+        }
+    }
+
+    throwBall() {
+        this.hasBall = false;
+        ball.owner = null;
+        ball.vx = Math.sin(this.angle) * 10 + (this.isP2 ? -14 : 14);
+        ball.vy = -11;
+        this.pickupTimer = 40;
+    }
+
+    update() {
+        if (this.pickupTimer > 0) this.pickupTimer--;
+        this.vy += WORLD.grav;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.angle += this.va;
+        this.vx *= WORLD.fric;
+        this.va *= 0.94;
+
+        if (this.y >= WORLD.ground) {
+            this.y = WORLD.ground;
+            this.vy = 0;
+            this.isGrounded = true;
+            let sway = Math.sin(Date.now() * 0.005) * 0.75; 
+            this.va += (sway - this.angle) * 0.12;
+            this.va *= 0.6;
+        }
+
+        if (this.x < 50) { this.x = 50; this.vx *= -0.5; }
+        if (this.x > 850) { this.x = 850; this.vx *= -0.5; }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = "#e0ac69";
+        ctx.fillRect(this.isP2 ? -35 : 15, -45, 20, 10);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-20, -60, 40, 60);
+        ctx.fillStyle = "#e0ac69";
+        ctx.fillRect(-18, -95, 36, 35);
+        ctx.fillStyle = "#eee";
+        ctx.fillRect(-18, -90, 36, 8); 
+        ctx.fillStyle = "#000";
+        ctx.fillRect(this.isP2 ? -10 : 4, -80, 6, 6);
+        ctx.restore();
+    }
+}
+
+const ball = {
+    x: 450, y: 100, vx: 0, vy: 0, r: 14, owner: null,
+    update() {
+        if (this.owner) {
+            let p = this.owner;
+            this.x = p.x + Math.sin(p.angle) * 35 + (p.isP2 ? -15 : 15);
+            this.y = p.y - 55 + Math.cos(p.angle) * 10;
+        } else {
+            this.vy += WORLD.grav * 0.8;
+            this.x += this.vx;
+            this.y += this.vy;
+            if (this.y > WORLD.ground + 10) {
+                this.y = WORLD.ground + 10;
+                this.vy *= -0.6;
+                this.vx *= 0.95;
+            }
+            if (this.x < 20 || this.x > 880) this.vx *= -0.8;
+
+            [p1, p2].forEach(p => {
+                let dx = this.x - p.x;
+                let dy = this.y - (p.y - 45);
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 90 && p.pickupTimer === 0) {
+                    this.owner = p;
+                    p.hasBall = true;
+                }
+            });
+        }
+        if (this.y > 180 && this.y < 260 && !this.owner) {
+            if (this.x > 840 && this.vx > 0) goal(1);
+            if (this.x < 60 && this.vx < 0) goal(2);
+        }
+    },
+    draw() {
+        ctx.fillStyle = '#cc6633';
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.stroke();
+    }
+};
+
+const p1 = new Player(250, '#992d22', false);
+const p2 = new Player(650, '#24527a', true);
+
+function startGame(mode) {
+    vsBot = (mode === 1);
+    scores = [0, 0]; updateScoreUI();
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('game-over').style.display = 'none';
+    p1.reset(); p2.reset(); resetBall();
+    gameActive = true;
+}
+
+function goal(p) {
+    scores[p-1]++; updateScoreUI();
+    if (scores[p-1] >= 5) endGame(p);
+    else { p1.reset(); p2.reset(); resetBall(); }
+}
+
+function resetBall() { ball.owner = null; ball.x = 450; ball.y = 50; ball.vx = 0; ball.vy = 0; }
+function updateScoreUI() { document.getElementById('s1').innerText = scores[0]; document.getElementById('s2').innerText = scores[1]; }
+
+function endGame(winner) {
+    gameActive = false;
+    document.getElementById('win-text').innerText = winner === 1 ? "КРАСНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+    document.getElementById('win-text').style.color = winner === 1 ? "#e74c3c" : "#3498db";
+    document.getElementById('game-over').style.display = 'flex';
+}
+
+function backToMenu() { document.getElementById('game-over').style.display = 'none'; document.getElementById('menu').style.display = 'flex'; }
+
+// НОВАЯ ЛОГИКА БОТА: БЕЗ ДВОЙНЫХ ПРЫЖКОВ
+function updateAI() {
+    if (!vsBot || !gameActive || !p2.isGrounded) return; // Прыгаем только с земли
+
+    let targetX = ball.x;
+    if (ball.owner === p2) {
+        targetX = 100; // Цель - кольцо слева
+        if (p2.x < 350 && p2.angle < -0.1) { p2.jump(); return; }
+    }
+
+    const diff = p2.x - targetX;
+
+    // Прыгаем влево
+    if (diff > 40 && p2.angle < -0.15) {
+        p2.jump();
+    } 
+    // Прыгаем вправо
+    else if (diff < -40 && p2.angle > 0.15) {
+        p2.jump();
+    }
+}
+
+function loop() {
+    ctx.clearRect(0, 0, 900, 450);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(0, WORLD.ground + 10, 900, 60);
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(0, 220, 55, 6); ctx.fillRect(845, 220, 55, 6);
+
+    if (gameActive) {
+        updateAI(); p1.update(); p2.update(); ball.update();
+    }
+    p1.draw(); p2.draw(); ball.draw();
+    requestAnimationFrame(loop);
+}
+
+window.addEventListener('keydown', e => {
+    if (!gameActive) return;
+    if (e.code === 'KeyW') p1.jump();
+    if (e.code === 'ArrowUp' && !vsBot) p2.jump();
+});
+
+loop();
+</script>
+</body>
+</html>

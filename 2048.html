@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 Pop-Art Street</title>
+    <style>
+        :root {
+            --bg: #111;
+            --accent: #ff0055;
+            --cyan: #00f2ff;
+            --yellow: #fefe00;
+            --cell-size: 80px;
+            --gap: 12px;
+        }
+
+        body {
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Arial Black', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* --- ГЛАВНОЕ МЕНЮ --- */
+        #menu {
+            position: fixed;
+            z-index: 100;
+            background: var(--bg);
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .title {
+            font-size: clamp(60px, 10vw, 90px);
+            color: var(--yellow);
+            text-shadow: 6px 6px 0 var(--accent), 12px 12px 0 #000;
+            margin-bottom: 40px;
+            transform: rotate(-3deg);
+            line-height: 0.9;
+            text-align: center;
+        }
+
+        .btn {
+            background: var(--cyan);
+            border: 5px solid #000;
+            padding: 15px 50px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 8px 8px 0 #000;
+            transition: 0.1s;
+            text-transform: uppercase;
+        }
+        .btn:hover { transform: scale(1.05) rotate(2deg); background: var(--accent); }
+        .btn:active { transform: translateY(4px); box-shadow: 2px 2px 0 #000; }
+
+        /* --- ИГРА --- */
+        .game-container {
+            display: none;
+            position: relative;
+        }
+
+        .score-board {
+            font-size: 24px;
+            background: var(--accent);
+            padding: 10px;
+            border: 4px solid #000;
+            box-shadow: 6px 6px 0 #000;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .grid {
+            width: 380px;
+            height: 380px;
+            background: #222;
+            border: 8px solid #000;
+            position: relative;
+            box-shadow: 15px 15px 0 var(--cyan);
+        }
+
+        .bg-cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background: #333;
+            position: absolute;
+            border-radius: 4px;
+        }
+
+        .tile {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            position: absolute;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            border: 4px solid #000;
+            box-sizing: border-box;
+            transition: transform 120ms ease-in-out; /* Скорость полета */
+            will-change: transform;
+        }
+
+        /* Анимации */
+        @keyframes popIn {
+            0% { transform: translate(var(--tx), var(--ty)) scale(0); }
+            100% { transform: translate(var(--tx), var(--ty)) scale(1); }
+        }
+
+        .tile-new { animation: popIn 0.15s ease-out forwards; }
+
+        /* Цвета Поп-Арт */
+        .t-2 { background: #fff; color: #000; }
+        .t-4 { background: var(--yellow); color: #000; }
+        .t-8 { background: #ffa500; color: #fff; }
+        .t-16 { background: #ff4500; color: #fff; }
+        .t-32 { background: var(--accent); color: #fff; }
+        .t-64 { background: #ff00ff; color: #fff; }
+        .t-128 { background: var(--cyan); color: #000; }
+        .t-256 { background: #00ff00; color: #000; box-shadow: 0 0 15px #00ff00; }
+
+        #game-over {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu">
+        <div class="title">2048<br>STREET</div>
+        <button class="btn" onclick="start()">ИГРАТЬ</button>
+    </div>
+
+    <div class="game-container" id="game">
+        <div class="score-board">SCORE: <span id="score">0</span></div>
+        <div class="grid" id="grid">
+            <div id="tile-container"></div>
+            <div id="game-over">
+                <h1 style="color:var(--accent); font-size: 40px; margin-bottom:20px;">GAME OVER</h1>
+                <button class="btn" onclick="start()">ЕЩЕ РАЗ</button>
+                <button class="btn" onclick="location.reload()" style="background:var(--yellow); margin-top:15px;">В МЕНЮ</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const tileContainer = document.getElementById('tile-container');
+    const scoreEl = document.getElementById('score');
+    const gameOverEl = document.getElementById('game-over');
+    const gridEl = document.getElementById('grid');
+    let board = [];
+    let score = 0;
+
+    // Генерим фон один раз
+    for (let i = 0; i < 16; i++) {
+        let cell = document.createElement('div');
+        cell.className = 'bg-cell';
+        cell.style.top = `${Math.floor(i / 4) * 92 + 12}px`;
+        cell.style.left = `${(i % 4) * 92 + 12}px`;
+        gridEl.appendChild(cell);
+    }
+
+    function start() {
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+        gameOverEl.style.display = 'none';
+        tileContainer.innerHTML = '';
+        board = Array(16).fill(null);
+        score = 0;
+        scoreEl.innerText = score;
+        addTile();
+        addTile();
+    }
+
+    function getPos(idx) {
+        return {
+            x: (idx % 4) * 92 + 12,
+            y: Math.floor(idx / 4) * 92 + 12
+        };
+    }
+
+    function addTile() {
+        let empty = board.map((v, i) => v === null ? i : null).filter(v => v !== null);
+        if (empty.length > 0) {
+            let idx = empty[Math.floor(Math.random() * empty.length)];
+            let val = Math.random() < 0.9 ? 2 : 4;
+            let pos = getPos(idx);
+            
+            let el = document.createElement('div');
+            el.className = `tile t-${val} tile-new`;
+            el.innerText = val;
+            // Установка переменных для CSS анимации появления прямо в нужной точке
+            el.style.setProperty('--tx', `${pos.x}px`);
+            el.style.setProperty('--ty', `${pos.y}px`);
+            el.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+            
+            tileContainer.appendChild(el);
+            board[idx] = { val, element: el };
+        }
+    }
+
+    function move(dir) {
+        let changed = false;
+        let axis = (dir === 'ArrowLeft' || dir === 'ArrowRight') ? 'h' : 'v';
+        let reverse = (dir === 'ArrowRight' || dir === 'ArrowDown');
+
+        for (let i = 0; i < 4; i++) {
+            let lineIndices = [];
+            for (let j = 0; j < 4; j++) {
+                lineIndices.push(axis === 'h' ? i * 4 + j : j * 4 + i);
+            }
+            if (reverse) lineIndices.reverse();
+
+            if (processLine(lineIndices)) changed = true;
+        }
+
+        if (changed) {
+            setTimeout(() => {
+                addTile();
+                if (!canMove() && !board.includes(null)) gameOverEl.style.display = 'flex';
+            }, 130);
+        }
+    }
+
+    function processLine(indices) {
+        let changed = false;
+        let line = indices.map(idx => board[idx]);
+        let nextLine = line.filter(t => t !== null);
+
+        for (let i = 0; i < nextLine.length - 1; i++) {
+            if (nextLine[i].val === nextLine[i + 1].val) {
+                let mergedTile = nextLine[i];
+                let fadingTile = nextLine[i + 1];
+                
+                mergedTile.val *= 2;
+                score += mergedTile.val;
+                scoreEl.innerText = score;
+
+                // Двигаем "исчезающую" плитку к основной
+                let targetPos = getPos(indices[i]);
+                fadingTile.element.style.transform = `translate(${targetPos.x}px, ${targetPos.y}px)`;
+                fadingTile.element.style.zIndex = 5;
+                
+                let elToRem = fadingTile.element;
+                let elToUpd = mergedTile.element;
+                let newVal = mergedTile.val;
+
+                setTimeout(() => {
+                    elToRem.remove();
+                    elToUpd.innerText = newVal;
+                    elToUpd.className = `tile t-${newVal}`;
+                }, 120);
+
+                nextLine.splice(i + 1, 1);
+                changed = true;
+            }
+        }
+
+        indices.forEach((idx, i) => {
+            let tile = nextLine[i] || null;
+            if (board[idx] !== tile) {
+                changed = true;
+                board[idx] = tile;
+            }
+            if (board[idx]) {
+                let pos = getPos(idx);
+                board[idx].element.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+                board[idx].element.classList.remove('tile-new');
+            }
+        });
+        return changed;
+    }
+
+    function canMove() {
+        for (let i = 0; i < 16; i++) {
+            let r = Math.floor(i / 4), c = i % 4;
+            let v = board[i]?.val;
+            if (!v) return true;
+            if (c < 3 && v === board[i+1]?.val) return true;
+            if (r < 3 && v === board[i+4]?.val) return true;
+        }
+        return false;
+    }
+
+    window.onkeydown = e => {
+        if (e.key.includes('Arrow')) {
+            e.preventDefault();
+            move(e.key);
+        }
+    };
+</script>
+</body>
+</html>

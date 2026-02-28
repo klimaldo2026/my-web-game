@@ -1,0 +1,254 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Soccer Random - Сальто по шансу</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+        #container { position: relative; }
+        canvas { border: 4px solid #333; background: #4CAF50; box-shadow: 0 20px 50px rgba(0,0,0,0.6); image-rendering: pixelated; }
+        .score { position: absolute; top: 30px; width: 100%; text-align: center; color: white; font-size: 60px; text-shadow: 5px 5px 0 #000; pointer-events: none; z-index: 5; }
+        #menu, #win-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 20px; }
+        #win-screen { display: none; background: rgba(0,0,0,0.9); }
+        button { padding: 20px 50px; font-size: 30px; font-family: 'Arial Black', sans-serif; background: #2ecc71; border: none; cursor: pointer; border-bottom: 8px solid #27ae60; border-radius: 15px; color: white; transition: 0.1s; width: 450px; }
+        button:hover { transform: scale(1.05); background: #27ae60; }
+        .ai-btn { background: #3498db; border-bottom: 8px solid #2980b9; }
+        .restart-btn { background: #f1c40f; border-bottom: 8px solid #f39c12; color: #000; }
+        #win-text { color: white; font-size: 60px; text-shadow: 5px 5px #000; margin-bottom: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="menu">
+            <h1 style="color:white; font-size:70px; margin-bottom:20px; text-shadow: 5px 5px #3498db;">ФУТБОЛ РАНДОМ</h1>
+            <button onclick="startGame(false)">2 ИГРОКА</button>
+            <button class="ai-btn" onclick="startGame(true)">1 ИГРОК (ПРОТИВ БОТА)</button>
+        </div>
+        <div id="win-screen">
+            <h2 id="win-text">КРАСНЫЙ ВЫИГРАЛ!</h2>
+            <button class="restart-btn" onclick="restartMatch()">ИГРАТЬ ЕЩЕ РАЗ</button>
+            <button onclick="backToMenu()">В ГЛАВНОЕ МЕНЮ</button>
+        </div>
+        <div class="score"><span id="s1">0</span> : <span id="s2">0</span></div>
+        <canvas id="game"></canvas>
+    </div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 1200;
+canvas.height = 600;
+
+let gameRunning = false;
+let vsAI = false;
+const WORLD = { grav: 0.5, fric: 0.98, ground: 540 };
+let score1 = 0, score2 = 0;
+const WIN_SCORE = 5;
+
+class Player {
+    constructor(x, color, isP2, name) {
+        this.startX = x; this.color = color; this.isP2 = isP2; this.name = name;
+        this.reset();
+    }
+    reset() {
+        this.x = this.startX; this.y = WORLD.ground;
+        this.vx = 0; this.vy = 0; this.angle = 0; this.va = 0;
+        this.isGrounded = false; this.isTouchingObject = false;
+        this.kickProgress = 0; this.aiDelay = 0;
+    }
+    getCollisionPoints() {
+        let pts = [];
+        [-90, -50, -10].forEach(h => {
+            pts.push({ x: this.x - h * Math.sin(this.angle), y: this.y + h * Math.cos(this.angle) - 15, r: 25 });
+        });
+        return pts;
+    }
+    jump() {
+        if (!gameRunning) return;
+        if (this.isGrounded || this.isTouchingObject) {
+            let jumpDir = Math.sin(this.angle);
+            let isJumpingBack = (this.isP2 && jumpDir > 0) || (!this.isP2 && jumpDir < 0);
+            let multiplier = isJumpingBack ? 1.6 : 1.1;
+            
+            this.vy = -11 * multiplier;
+            this.vx = (jumpDir * 9 + (this.isP2 ? -3.5 : 3.5)) * multiplier;
+            
+            // ШАНС 20% НА МОЩНОЕ САЛЬТО (360)
+            if (Math.random() < 0.2) {
+                // Даем сильный вращательный импульс
+                this.va = (this.vx * 0.15) + (Math.random() - 0.5) * 1.0;
+            } else {
+                // Обычный прыжок с легким покачиванием, чтобы не крутило сальто
+                this.va = (this.vx * 0.03); 
+            }
+
+            this.isGrounded = false;
+            this.isTouchingObject = false;
+            this.kickProgress = 1.3;
+        }
+    }
+    update() {
+        this.vy += WORLD.grav;
+        this.x += this.vx; this.y += this.vy;
+        this.angle += this.va;
+        this.vx *= WORLD.fric; this.va *= 0.94;
+        if (this.kickProgress > 0) this.kickProgress -= 0.05;
+
+        if (this.y >= WORLD.ground) {
+            this.y = WORLD.ground; this.vy = 0; this.isGrounded = true;
+            let sway = Math.sin(Date.now() * 0.005) * 1.17;
+            this.va += (sway - this.angle) * 0.135;
+            this.va *= 0.7;
+            this.kickProgress = 0;
+        } else { this.isGrounded = false; }
+
+        if (this.x < 50) { this.x = 50; this.vx *= -0.5; }
+        if (this.x > 1150) { this.x = 1150; this.vx *= -0.5; }
+
+        if (vsAI && this.isP2 && gameRunning) {
+            if (this.aiDelay > 0) this.aiDelay--;
+            const dx = ball.x - this.x;
+            if ((this.isGrounded || this.isTouchingObject) && this.aiDelay <= 0) {
+                if (dx < 250 || (dx > 30 && ball.x > 1000)) {
+                    if (ball.y > 100 || Math.abs(dx) < 80) {
+                        this.jump();
+                        this.aiDelay = 15;
+                    }
+                }
+            }
+        }
+    }
+    draw() {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+        const bodyW = 40; const torsoH = 45; const legW = bodyW / 2;
+        ctx.fillStyle = this.color; ctx.fillRect(-bodyW/2, -30 - torsoH, bodyW, torsoH); 
+        ctx.fillRect(this.isP2 ? 0 : -legW, -30, legW, 30);
+        ctx.fillStyle = "#000"; ctx.fillRect(this.isP2 ? -2 : -legW - 4, 0, legW + 6, 14);
+        ctx.save(); ctx.translate(0, -30); 
+        if (this.kickProgress > 0) { let kickDir = this.isP2 ? 1.5 : -1.5; ctx.rotate(this.kickProgress * kickDir); }
+        ctx.fillStyle = this.color; ctx.fillRect(this.isP2 ? -legW : 0, 0, legW, 30); 
+        ctx.fillStyle = "#000"; ctx.fillRect(this.isP2 ? -legW - 4 : -2, 30, legW + 6, 14);
+        ctx.restore();
+        ctx.fillStyle = "#ffdbac"; ctx.fillRect(-15, -40 - torsoH - 26, 30, 30);
+        ctx.fillStyle = "black"; ctx.fillRect(this.isP2 ? -10 : 4, -40 - torsoH - 18, 7, 7);
+        ctx.restore();
+    }
+}
+
+const ball = {
+    x: 600, y: 200, vx: 0, vy: 0, r: 15,
+    update() {
+        this.vy += WORLD.grav * 0.8;
+        this.x += this.vx; this.y += this.vy;
+        if (this.y > WORLD.ground + 10) { this.y = WORLD.ground + 10; this.vy *= -0.75; this.vx *= 0.96; }
+        if (this.x < 15 || this.x > 1185) { this.vx *= -0.8; this.x = this.x < 15 ? 15 : 1185; }
+        const goalTop = WORLD.ground - 210;
+        if ((this.x < 100 || this.x > 1100) && Math.abs(this.y - goalTop) < 15) {
+            this.vy *= -1.1; this.y = (this.y < goalTop) ? goalTop - 15 : goalTop + 15;
+        }
+        [p1, p2].forEach(p => {
+            let pts = p.getCollisionPoints();
+            pts.forEach(pt => {
+                let dx = this.x - pt.x; let dy = this.y - pt.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < pt.r + this.r) {
+                    let ang = Math.atan2(dy, dx);
+                    let force = (p.kickProgress > 0.1) ? 20 : 15;
+                    this.vx = Math.cos(ang) * force; this.vy = Math.sin(ang) * force - 2;
+                    this.x = pt.x + Math.cos(ang) * (pt.r + this.r); this.y = pt.y + Math.sin(ang) * (pt.r + this.r);
+                    p.isTouchingObject = true;
+                }
+            });
+        });
+        if (this.y > goalTop + 10) { if (this.x > 1175) goal(1); if (this.x < 25) goal(2); }
+    },
+    draw() {
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+        ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.stroke();
+    }
+};
+
+function checkPlayersCollision() {
+    let pts1 = p1.getCollisionPoints(); let pts2 = p2.getCollisionPoints();
+    pts1.forEach(c1 => {
+        pts2.forEach(c2 => {
+            let dx = c1.x - c2.x; let dy = c1.y - c2.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let minDist = c1.r + c2.r;
+            if (dist < minDist) {
+                p1.isTouchingObject = true; p2.isTouchingObject = true;
+                let overlap = minDist - dist;
+                let ang = Math.atan2(dy, dx);
+                p1.x += Math.cos(ang) * overlap * 0.5; p1.y += Math.sin(ang) * overlap * 0.5;
+                p2.x -= Math.cos(ang) * overlap * 0.5; p2.y -= Math.sin(ang) * overlap * 0.5;
+            }
+        });
+    });
+}
+
+const p1 = new Player(400, '#e74c3c', false, "КРАСНЫЙ ИГРОК");
+const p2 = new Player(800, '#3498db', true, "СИНИЙ ИГРОК");
+
+function drawField() {
+    ctx.fillStyle = '#2ecc71'; ctx.fillRect(0, 0, 1200, 600);
+    ctx.fillStyle = '#3e8e41'; ctx.fillRect(0, WORLD.ground + 14, 1200, 46);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, WORLD.ground - 210, 10, 225); ctx.fillRect(0, WORLD.ground - 210, 100, 15); 
+    ctx.fillRect(1190, WORLD.ground - 210, 10, 225); ctx.fillRect(1100, WORLD.ground - 210, 100, 15); 
+}
+
+function goal(p) {
+    if (!gameRunning) return;
+    if (p === 1) score1++; else score2++;
+    document.getElementById('s1').innerText = score1; document.getElementById('s2').innerText = score2;
+    if (score1 >= WIN_SCORE || score2 >= WIN_SCORE) endGame(score1 >= WIN_SCORE ? p1 : p2);
+    else { p1.reset(); p2.reset(); ball.x = 600; ball.y = 150; ball.vx = 0; ball.vy = 0; }
+}
+
+function endGame(winner) {
+    gameRunning = false;
+    const winScreen = document.getElementById('win-screen');
+    const winText = document.getElementById('win-text');
+    if (vsAI && winner.isP2) { winText.innerText = "БОТ ПОБЕДИЛ!"; winText.style.color = "#3498db"; }
+    else { winText.innerText = winner.name + " ПОБЕДИЛ!"; winText.style.color = winner.color; }
+    winScreen.style.display = 'flex';
+}
+
+function restartMatch() {
+    score1 = 0; score2 = 0;
+    document.getElementById('s1').innerText = 0; document.getElementById('s2').innerText = 0;
+    document.getElementById('win-screen').style.display = 'none';
+    p1.reset(); p2.reset(); ball.x = 600; ball.y = 150; ball.vx = 0; ball.vy = 0;
+    gameRunning = true;
+}
+
+function backToMenu() {
+    document.getElementById('win-screen').style.display = 'none';
+    document.getElementById('menu').style.display = 'flex';
+}
+
+function startGame(ai) {
+    vsAI = ai; score1 = 0; score2 = 0;
+    document.getElementById('s1').innerText = 0; document.getElementById('s2').innerText = 0;
+    document.getElementById('menu').style.display = 'none';
+    p1.reset(); p2.reset(); ball.x = 600; ball.y = 150;
+    gameRunning = true;
+}
+
+function loop() {
+    ctx.clearRect(0,0,1200,600); drawField();
+    p1.isTouchingObject = false; p2.isTouchingObject = false;
+    if (gameRunning) { checkPlayersCollision(); ball.update(); }
+    p1.update(); p2.update(); p1.draw(); p2.draw(); ball.draw();
+    requestAnimationFrame(loop);
+}
+
+window.addEventListener('keydown', e => {
+    if (e.code === 'KeyW') p1.jump();
+    if (!vsAI && e.code === 'ArrowUp') p2.jump();
+});
+loop();
+</script>
+</body>
+</html>
