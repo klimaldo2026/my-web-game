@@ -1,0 +1,1253 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age of Empire: Ultimate Tactical Simulation</title>
+    <style>
+        :root {
+            --bg-deep: #08080c;
+            --ui-panel: #12121b;
+            --ui-border: #22222e;
+            --gold: #f1c40f;
+            --text-primary: #f5f5f7;
+            --p1-color: #2980b9;
+            --p2-color: #c0392b;
+            --tile-size: 38px; 
+            --side-panel-w: 300px;
+            --ease: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            outline: none;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .scroller::-webkit-scrollbar { width: 4px; height: 4px; }
+        .scroller::-webkit-scrollbar-track { background: transparent; }
+        .scroller::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        .scroller::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.97);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(20px);
+        }
+
+        .modal-card {
+            background: var(--ui-panel);
+            border: 1px solid var(--ui-border);
+            padding: 60px;
+            border-radius: 40px;
+            width: 560px;
+            text-align: center;
+            box-shadow: 0 40px 120px rgba(0,0,0,0.8);
+        }
+
+        .modal-card h1 {
+            font-size: 58px;
+            color: var(--gold);
+            margin: 0 0 10px 0;
+            font-weight: 900;
+            letter-spacing: -1px;
+        }
+
+        .modal-card p {
+            color: #555;
+            font-size: 18px;
+            margin-bottom: 45px;
+            font-weight: 500;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 22px;
+            margin: 12px 0;
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--ease);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .btn-prime { background: #15803d; color: #fff; }
+        .btn-prime:hover { background: #16a34a; transform: translateY(-3px); box-shadow: 0 10px 25px rgba(22,163,74,0.4); }
+        
+        .btn-sec { background: #1f2937; color: #eee; border: 1px solid #374151; }
+        .btn-sec:hover { background: #374151; border-color: var(--gold); }
+
+        .btn-danger { background: #991b1b; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+
+        .setup-row { text-align: left; margin-bottom: 30px; }
+        .setup-row span { display: block; margin: 20px 0 10px; color: #888; font-size: 13px; text-transform: uppercase; }
+        .color-list { display: flex; gap: 10px; flex-wrap: wrap; }
+        .dot {
+            width: 38px; height: 38px; border-radius: 12px; border: 2px solid transparent;
+            cursor: pointer; transition: 0.2s;
+        }
+        .dot.selected { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 15px rgba(255,255,255,0.4); }
+
+        .layout { display: flex; width: 100%; height: 100%; }
+
+        .side-left {
+            width: var(--side-panel-w);
+            background: var(--ui-panel);
+            border-right: 1px solid var(--ui-border);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .side-head { padding: 35px 25px; border-bottom: 1px solid var(--ui-border); }
+        .side-head h2 { margin: 0; color: var(--gold); font-size: 22px; letter-spacing: 1px; }
+
+        .shop-box { flex-grow: 1; overflow-y: auto; padding: 20px; }
+        .shop-label {
+            font-size: 11px; color: #444; text-transform: uppercase;
+            letter-spacing: 2px; margin: 25px 0 12px 5px; font-weight: 800;
+        }
+
+        .item-card {
+            background: #1a1a24;
+            border: 1px solid #282835;
+            padding: 18px;
+            border-radius: 16px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .item-card:hover { border-color: var(--gold); background: #222230; transform: translateX(5px); }
+        .item-card.active { border-color: var(--gold); background: #252535; }
+        .item-card h4 { margin: 0; font-size: 16px; display: flex; justify-content: space-between; }
+        .item-card p { margin: 10px 0 0 0; font-size: 11px; color: #888; line-height: 1.5; }
+        .cost { color: var(--gold); font-weight: 800; font-size: 12px; }
+
+        .main-stage {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background: #050507;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-top {
+            height: 80px;
+            background: rgba(0,0,0,0.4);
+            border-bottom: 1px solid #1a1a22;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            z-index: 50;
+        }
+        #turn-msg { font-size: 30px; font-weight: 900; text-transform: uppercase; letter-spacing: 6px; }
+
+        .grid-holder {
+            flex-grow: 1;
+            overflow: auto; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; 
+            padding: 40px 20px;
+        }
+
+        .grid-core {
+            display: grid;
+            grid-template-columns: repeat(14, var(--tile-size));
+            grid-template-rows: repeat(14, var(--tile-size));
+            gap: 5px;
+            background: #111116;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 80px rgba(0,0,0,0.9);
+            min-width: min-content;
+        }
+
+        .tile {
+            width: var(--tile-size);
+            height: var(--tile-size);
+            background: #1c1c28;
+            border: 1px solid #2a2a38;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            cursor: pointer;
+            position: relative;
+            transition: 0.1s;
+        }
+        .tile:hover { transform: scale(1.12); z-index: 20; border-color: #555; filter: brightness(1.3); }
+        .tile.selected { border: 2px solid #fff; box-shadow: inset 0 0 10px rgba(255,255,255,0.4); z-index: 19; }
+
+        .tile.mtn { background: #33251a !important; }
+        .tile.wtr { background: #132d46 !important; }
+        .tile.rad { background: #0f160f !important; background-image: radial-gradient(#2ecc71 1px, transparent 1px); background-size: 5px 5px; }
+
+        .tile.p1-zone { box-shadow: inset 0 0 12px var(--p1-color); border-color: var(--p1-color); }
+        .tile.p2-zone { box-shadow: inset 0 0 12px var(--p2-color); border-color: var(--p2-color); }
+
+        .indicator {
+            position: absolute; bottom: 1px; right: 2px; font-size: 9px;
+            background: rgba(0,0,0,0.85); color: #fff; padding: 1px 3px; border-radius: 3px;
+            font-weight: 800; pointer-events: none;
+        }
+
+        .side-right {
+            width: var(--side-panel-w);
+            background: var(--ui-panel);
+            border-left: 1px solid var(--ui-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .stats-wrap { padding: 30px 20px; flex-shrink: 0; }
+        .player-box {
+            background: #171720;
+            border-radius: 24px;
+            padding: 22px;
+            margin-bottom: 25px;
+            border-left: 6px solid transparent;
+            transition: 0.3s;
+        }
+        .player-box.active { background: #1f1f2d; transform: scale(1.04); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; }
+        .res-pill { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .inc-text { font-size: 10px; color: #22c55e; margin-left: 2px; }
+
+        .event-log {
+            flex-grow: 1;
+            margin: 0 20px 20px 20px;
+            background: #08080a;
+            border-radius: 20px;
+            border: 1px solid #1a1a22;
+            overflow-y: auto;
+            padding: 20px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 10px;
+        }
+        .log-item { border-bottom: 1px solid #111; padding-bottom: 6px; line-height: 1.4; color: #666; }
+    </style>
+</head>
+<body class="scroller">
+
+    <div id="scr-menu" class="overlay">
+        <div class="modal-card">
+            <h1>Age of Empire</h1>
+            <p>Ultimate Tactical Simulation</p>
+            
+            <div id="menu-start">
+                <button class="btn btn-sec" onclick="openSetup('bot')">ОДИНОЧНАЯ ИГРА (БОТ)</button>
+                <button class="btn btn-sec" onclick="openSetup('pvp')">ДВА ИГРОКА (PVP)</button>
+            </div>
+
+            <div id="menu-config" style="display: none;">
+                <div class="setup-row">
+                    <span>Цвет Игрока 1:</span>
+                    <div id="pal-p1" class="color-list"></div>
+                    <span id="pal-p2-label">Цвет Бота:</span>
+                    <div id="pal-p2" class="color-list"></div>
+                </div>
+                <button class="btn btn-prime" onclick="startEngine()">НАЧАТЬ ВОЙНУ</button>
+                <button class="btn btn-sec" style="font-size: 13px; opacity: 0.5;" onclick="backToMain()">НАЗАД</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="scr-win" class="overlay" style="display: none;">
+        <div class="modal-card">
+            <h1 id="winner-title">ПОБЕДА!</h1>
+            <p id="winner-desc">Вы разгромили вражескую коалицию.</p>
+            <button class="btn btn-prime" onclick="location.reload()">В МЕНЮ</button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <aside class="side-left">
+            <div class="side-head">
+                <h2>МАГАЗИН</h2>
+            </div>
+            <div class="shop-box scroller">
+                <div class="shop-label">Здания</div>
+                <div id="list-buildings"></div>
+                <div class="shop-label">Силовые структуры</div>
+                <div id="list-military"></div>
+            </div>
+            <div style="padding: 20px; border-top: 1px solid var(--ui-border);">
+                <button id="btn-cancel" class="btn btn-sec" style="display: none; height: 55px;" onclick="world.abort()">ОТМЕНИТЬ</button>
+            </div>
+        </aside>
+
+        <main class="main-stage">
+            <div class="status-top">
+                <div id="turn-msg">ХОД 1</div>
+            </div>
+            <div class="grid-holder scroller">
+                <div id="board-grid" class="grid-core"></div>
+            </div>
+        </main>
+
+        <aside class="side-right">
+            <div class="stats-wrap">
+                <div id="card-p1" class="player-box">
+                    <h3 id="name-p1" style="margin:0; font-size: 18px;">Игрок 1</h3>
+                    <div id="res-p1" class="res-grid"></div>
+                </div>
+                <div id="card-p2" class="player-box">
+                    <h3 id="name-p2" style="margin:0; font-size: 18px;">Бот</h3>
+                    <div id="res-p2" class="res-grid"></div>
+                </div>
+                <button class="btn btn-prime" id="btn-end" onclick="world.next()">ЗАВЕРШИТЬ ХОД</button>
+                <button class="btn btn-danger" style="margin-top: 15px; height: 45px; font-size: 13px;" onclick="world.quit()">КАПИТУЛЯЦИЯ</button>
+            </div>
+            <div id="log-list" class="event-log scroller"></div>
+        </aside>
+    </div>
+
+<script>
+/* ================================================================
+   JAVASCRIPT - ДВИЖОК ИГРЫ (1100+ СТРОК ЛОГИКИ)
+   ================================================================
+*/
+
+const GAME_DB = {
+    buildings: {
+        cell: { 
+            id: 'cell', name: 'Клетка', icon: '⬜', cost: { money: 70 }, 
+            desc: 'Расширение территории. Ставится рядом со своей клеткой.' 
+        },
+        mine: { 
+            id: 'mine', name: 'Шахта', icon: '⛏️', cost: { money: 300 }, income: { metal: 25 }, 
+            desc: 'Только на горе (⛰️). Приносит металл. (+25 🔩/ход)' 
+        },
+        hydro: { 
+            id: 'hydro', name: 'ГЭС', icon: '🌊', cost: { money: 250, metal: 50 }, income: { energy: 50, water: 50 }, 
+            desc: 'Только на озере (💧). Приносит энергию. (+50 ⚡, +50 💧/ход)' 
+        },
+        toyFact: { 
+            id: 'toyFact', name: 'Завод игрушек', icon: '🧸', cost: { money: 180 }, income: { money: 60 }, 
+            desc: 'Приносит деньги. (+60 💵/ход)' 
+        },
+        clothFact: { 
+            id: 'clothFact', name: 'Фабрика одежды', icon: '👕', cost: { money: 380 }, income: { money: 150 }, 
+            desc: 'Приносит много денег. (+150 💵/ход)' 
+        }
+    },
+    military: {
+        computer: { 
+            id: 'computer', name: 'Компьютер', icon: '💻', cost: { money: 350, metal: 100, energy: 200 }, 
+            desc: 'Защищает 3x3 от ракет 3 раунда. Макс 1 за раунд.' 
+        },
+        fortress: { 
+            id: 'fortress', name: 'Крепость', icon: '🏰', cost: { money: 350, metal: 100, energy: 50 }, 
+            desc: 'Блокирует армию и климеп. Ломается танком. 1 за раунд.' 
+        },
+        klimep: { 
+            id: 'klimep', name: 'Климеп', icon: '🚗', cost: { money: 300, metal: 100, energy: 100, water: 50 }, 
+            moves: 3, caps: 2, 
+            desc: 'Мобильный захватчик. Ходов: 3. Захват клетки: 2 раунда. Лимит захватов: 2.' 
+        },
+        tank: { 
+            id: 'tank', name: 'Танк', icon: '🚜', cost: { money: 500, metal: 100, energy: 100, water: 150 }, 
+            moves: 2, caps: 4, 
+            desc: 'Тяжелая техника. Ходов: 2. Мгновенный захват. Лимит: 4. Ломает крепость.' 
+        },
+        army: { 
+            id: 'army', name: 'Армия', icon: '🧍', cost: { money: 150, metal: 50, water: 50 }, 
+            moves: 1, caps: 0, 
+            desc: 'Базовый юнит. Уничтожает климеп и танки. Ходов: 1.' 
+        },
+        rocket: { 
+            id: 'rocket', name: 'Ракета', icon: '🚀', cost: { money: 1000, metal: 250, energy: 200, water: 100 }, 
+            desc: 'Уничтожает область 3x3. Оставляет ядерный след ☢️.' 
+        }
+    }
+};
+
+const COLORS = [
+    { n: 'Синий', h: '#2980b9' }, { n: 'Красный', h: '#c0392b' },
+    { n: 'Изумруд', h: '#27ae60' }, { n: 'Золото', h: '#f39c12' },
+    { n: 'Аметист', h: '#8e44ad' }, { n: 'Морковный', h: '#d35400' },
+    { n: 'Мята', h: '#1abc9c' }, { n: 'Сталь', h: '#7f8c8d' }
+];
+
+let gameMode = 'bot';
+let cP1 = 0;
+let cP2 = 1;
+
+function openSetup(mode) {
+    gameMode = mode;
+    document.getElementById('menu-start').style.display = 'none';
+    document.getElementById('menu-config').style.display = 'block';
+    document.getElementById('pal-p2-label').innerText = mode === 'bot' ? 'Цвет Бота:' : 'Цвет Игрока 2:';
+    renderPalettes();
+}
+
+function backToMain() {
+    document.getElementById('menu-start').style.display = 'block';
+    document.getElementById('menu-config').style.display = 'none';
+}
+
+function renderPalettes() {
+    const p1 = document.getElementById('pal-p1');
+    const p2 = document.getElementById('pal-p2');
+    p1.innerHTML = ''; p2.innerHTML = '';
+
+    COLORS.forEach((c, i) => {
+        const d1 = document.createElement('div');
+        d1.className = `dot ${i === cP1 ? 'selected' : ''}`;
+        d1.style.background = c.h;
+        d1.onclick = () => { cP1 = i; renderPalettes(); };
+        p1.appendChild(d1);
+
+        const d2 = document.createElement('div');
+        d2.className = `dot ${i === cP2 ? 'selected' : ''}`;
+        d2.style.background = c.h;
+        d2.onclick = () => { cP2 = i; renderPalettes(); };
+        p2.appendChild(d2);
+    });
+}
+
+class Player {
+    constructor(id, name, color) {
+        this.id = id;
+        this.name = name;
+        this.color = color;
+        this.res = { money: 1000, metal: 50, energy: 0, water: 0 };
+        this.inc = { money: 0, metal: 0, energy: 0, water: 0 };
+        this.rocketCooldown = 0;
+    }
+
+    canPay(cost) {
+        for (let r in cost) if (this.res[r] < cost[r]) return false;
+        return true;
+    }
+
+    pay(cost) {
+        for (let r in cost) this.res[r] -= cost[r];
+    }
+
+    collect() {
+        for (let r in this.inc) this.res[r] += this.inc[r];
+        if (this.rocketCooldown > 0) this.rocketCooldown--;
+    }
+}
+
+class Engine {
+    constructor(mode) {
+        this.mode = mode;
+        this.size = 14;
+        this.round = 1;
+        this.turn = 1;
+        this.players = {
+            1: new Player(1, "Игрок 1", COLORS[cP1].h),
+            2: new Player(2, mode === 'bot' ? "Бот" : "Игрок 2", COLORS[cP2].h)
+        };
+        this.map = [];
+        this.selected = null;
+        this.action = 'idle';
+        this.activeItem = null;
+
+        this.init();
+    }
+
+    init() {
+        this.createMap();
+        this.drawShop();
+        this.refreshUI();
+        this.log("Инициализация завершена. Жду приказов.", "#fff");
+    }
+
+    log(msg, clr = "#666") {
+        const log = document.getElementById('log-list');
+        const d = document.createElement('div');
+        d.className = 'log-item';
+        d.innerHTML = `<span style="color:#333">[T${this.round}]</span> <span style="color:${clr}">${msg}</span>`;
+        log.prepend(d);
+    }
+
+    createMap() {
+        const grid = document.getElementById('board-grid');
+        grid.innerHTML = '';
+        this.map = [];
+
+        for (let y = 0; y < this.size; y++) {
+            this.map[y] = [];
+            for (let x = 0; x < this.size; x++) {
+                const c = { x, y, owner: 0, type: 'plain', building: null, unit: null, shield: 0 };
+                this.map[y][x] = c;
+                const tile = document.createElement('div');
+                tile.id = `t-${x}-${y}`;
+                tile.className = 'tile';
+                tile.onclick = () => this.onTileClick(x, y);
+                grid.appendChild(tile);
+            }
+        }
+
+        this.map[0][0].owner = 1; this.map[0][0].building = { id: 'base', icon: '🏠' };
+        this.map[13][13].owner = 2; this.map[13][13].building = { id: 'base', icon: '🏠' };
+
+        this.generateFeature('mtn', 2, 2, 3);
+        this.generateFeature('wtr', 2, 3, 3);
+
+        this.render();
+    }
+
+    generateFeature(type, count, w, h) {
+        let placed = 0;
+        while (placed < count) {
+            let rx = Math.floor(Math.random() * (this.size - w));
+            let ry = Math.floor(Math.random() * (this.size - h));
+            if ((rx+ry < 5) || (rx+ry > 18)) continue;
+            let clear = true;
+            for (let y = ry; y < ry + h; y++) {
+                for (let x = rx; x < rx + w; x++) {
+                    if (this.map[y][x].type !== 'plain') clear = false;
+                }
+            }
+            if (clear) {
+                for (let y = ry; y < ry + h; y++) {
+                    for (let x = rx; x < rx + w; x++) this.map[y][x].type = type;
+                }
+                placed++;
+            }
+        }
+    }
+
+    render() {
+        for (let y = 0; y < this.size; y++) {
+            for (let x = 0; x < this.size; x++) {
+                const c = this.map[y][x];
+                const el = document.getElementById(`t-${x}-${y}`);
+                
+                el.className = 'tile';
+                if (c.type !== 'plain') el.classList.add(c.type);
+                if (c.owner === 1) el.classList.add('p1-zone');
+                if (c.owner === 2) el.classList.add('p2-zone');
+                if (this.selected && this.selected.x === x && this.selected.y === y) el.classList.add('selected');
+
+                let ico = '';
+                if (c.unit) ico = c.unit.icon;
+                else if (c.building) ico = c.building.icon;
+                else if (c.type === 'mtn') ico = '⛰️';
+                else if (c.type === 'wtr') ico = '💧';
+
+                el.innerText = ico;
+
+                let badgeStr = '';
+                if (c.unit && c.unit.moves > 0) badgeStr = '👟';
+                if (c.shield > 0) badgeStr = `🛡️${c.shield}`;
+                if (c.unit && c.unit.timer > 0) badgeStr = `⏳${c.unit.timer}`;
+
+                let b = el.querySelector('.indicator');
+                if (!b && badgeStr) {
+                    b = document.createElement('span');
+                    b.className = 'indicator';
+                    el.appendChild(b);
+                }
+                if (b) b.innerText = badgeStr;
+                else if (el.querySelector('.indicator') && !badgeStr) el.querySelector('.indicator').remove();
+            }
+        }
+    }
+
+    drawShop() {
+        const bList = document.getElementById('list-buildings');
+        const mList = document.getElementById('list-military');
+        bList.innerHTML = ''; mList.innerHTML = '';
+
+        const makeItem = (obj, cat) => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            let costs = Object.entries(obj.cost).map(([k,v]) => `${v}${this.rIcon(k)}`).join(' ');
+            card.innerHTML = `
+                <h4><span>${obj.icon} ${obj.name}</span> <span class="cost">${costs}</span></h4>
+                <p>${obj.desc}</p>
+            `;
+            card.onclick = () => this.onBuy(cat, obj.id);
+            return card;
+        };
+
+        for (let k in GAME_DB.buildings) bList.appendChild(makeItem(GAME_DB.buildings[k], 'buildings'));
+        for (let k in GAME_DB.military) mList.appendChild(makeItem(GAME_DB.military[k], 'military'));
+    }
+
+    rIcon(r) { return {money:'💵', metal:'🔩', energy:'⚡', water:'💧'}[r]; }
+
+    onBuy(cat, id) {
+        if (this.turn === 2 && this.mode === 'bot') return;
+        const p = this.players[this.turn];
+        const item = GAME_DB[cat][id];
+
+        if (!p.canPay(item.cost)) { this.log("Недостаточно ресурсов!", "#e74c3c"); return; }
+        if (id === 'rocket' && p.rocketCooldown > 0) { this.log("Ракета в шахте!", "#e74c3c"); return; }
+
+        this.activeItem = { cat, id, data: item };
+        this.action = id === 'rocket' ? 'rocket' : (cat === 'buildings' ? 'build' : 'spawn');
+        
+        document.getElementById('btn-cancel').style.display = 'block';
+        this.log(`Выбрано: ${item.name}. Укажите цель на карте.`, "#f1c40f");
+    }
+
+    abort() {
+        this.action = 'idle'; this.activeItem = null; this.selected = null;
+        document.getElementById('btn-cancel').style.display = 'none';
+        this.render();
+    }
+
+    onTileClick(x, y) {
+        if (this.turn === 2 && this.mode === 'bot') return;
+        const cell = this.map[y][x];
+
+        if (this.action === 'rocket') return this.doRocket(x, y);
+        if (this.action === 'build') return this.doBuild(x, y);
+        if (this.action === 'spawn') return this.doSpawn(x, y);
+        if (this.action === 'move') return this.doMove(x, y);
+
+        if (cell.unit && cell.owner === this.turn && cell.unit.moves > 0) {
+            this.selected = { x, y };
+            this.action = 'move';
+            this.render();
+        } else {
+            this.selected = { x, y };
+            this.render();
+        }
+    }
+
+    doBuild(x, y) {
+        const p = this.players[this.turn];
+        const cell = this.map[y][x];
+        const item = this.activeItem.data;
+
+        if (this.activeItem.id === 'cell') {
+            if (cell.owner === 0 && this.isNear(x, y, this.turn) && cell.type !== 'rad') {
+                p.pay(item.cost); cell.owner = this.turn;
+                this.log(`Территория расширена [${x},${y}].`);
+                this.done();
+            }
+            return;
+        }
+
+        if (cell.owner !== this.turn || cell.building || cell.unit) return;
+
+        let ok = false;
+        if (item.id === 'mine' && cell.type === 'mtn') ok = true;
+        else if (item.id === 'hydro' && cell.type === 'wtr') ok = true;
+        else if (['toyFact', 'clothFact', 'computer', 'fortress'].includes(item.id) && cell.type === 'plain') ok = true;
+
+        if (ok) {
+            p.pay(item.cost);
+            cell.building = { id: item.id, icon: item.icon };
+            if (item.income) for (let r in item.income) p.inc[r] += item.income[r];
+            if (item.id === 'computer') cell.shield = 3;
+            this.log(`Объект ${item.name} развернут.`);
+            this.done();
+        }
+    }
+
+    doSpawn(x, y) {
+        const p = this.players[this.turn];
+        const cell = this.map[y][x];
+        const item = this.activeItem.data;
+
+        if (cell.owner === this.turn && !cell.unit && cell.type !== 'rad') {
+            p.pay(item.cost);
+            cell.unit = {
+                id: item.id, icon: item.icon,
+                moves: item.moves || 0,
+                max: item.moves || 0,
+                caps: item.caps || 0,
+                timer: 0,
+                owner: this.turn
+            };
+            this.log(`Мобилизация: ${item.name}.`);
+            this.done();
+        }
+    }
+
+    doMove(tx, ty) {
+        const sx = this.selected.x, sy = this.selected.y;
+        const sC = this.map[sy][sx], tC = this.map[ty][tx];
+        const foe = this.turn === 1 ? 2 : 1;
+
+        if (Math.abs(sx - tx) + Math.abs(sy - ty) !== 1) return;
+        if (tC.type === 'rad') return;
+
+        // Фортификация - танк может разрушить крепость
+        if (tC.building && tC.building.id === 'fortress' && tC.owner === foe) {
+            if (sC.unit.id === 'tank') {
+                this.log("🚜 Танк уничтожил крепость!");
+                tC.building = null;
+            } else {
+                // Климеп и армия не могут пройти через крепость
+                return;
+            }
+        }
+
+        // Атака
+        if (tC.unit && tC.unit.owner === foe) {
+            // Армия уничтожает климеп и танк
+            if (sC.unit.id === 'army') {
+                this.log("🧍 Пехота нейтрализовала врага!");
+                tC.unit = null;
+            }
+            // Танк уничтожает климеп (но не армию)
+            else if (sC.unit.id === 'tank' && tC.unit.id === 'klimep') {
+                this.log("🚜 Танк раздавил разведчика!");
+                tC.unit = null;
+            }
+            // Климеп всегда умирает при контакте
+            else if (sC.unit.id === 'klimep') {
+                this.log("🚗 Климеп был уничтожен!");
+                sC.unit = null;
+                return;
+            }
+            else return;
+        } else if (tC.unit) return;
+
+        // Перемещение
+        tC.unit = sC.unit;
+        sC.unit = null;
+        tC.unit.owner = this.turn;
+        tC.unit.moves--;
+
+        // Захват
+        if (tC.owner !== this.turn && tC.owner !== 0) {
+            if (tC.unit.id === 'tank') {
+                this.capture(tx, ty, this.turn);
+                tC.unit.caps--;
+                if (tC.unit.caps <= 0) tC.unit = null;
+            } else if (tC.unit.id === 'klimep') {
+                tC.unit.timer = 2;
+            }
+        }
+
+        if (tC.unit && tC.unit.moves > 0) {
+            this.selected = { x: tx, y: ty };
+        } else {
+            this.action = 'idle'; this.selected = null;
+        }
+        this.render();
+    }
+
+    capture(x, y, pId) {
+        const c = this.map[y][x];
+        const old = c.owner;
+        if (old > 0 && c.building) {
+            const itm = GAME_DB.buildings[c.building.id];
+            if (itm && itm.income) for (let r in itm.income) this.players[old].inc[r] -= itm.income[r];
+        }
+        c.owner = pId; c.building = null;
+        this.log(`Сектор [${x},${y}] перешел под контроль ${this.players[pId].name}.`);
+    }
+
+    doRocket(cx, cy) {
+        const p = this.players[this.turn];
+        const foe = this.turn === 1 ? 2 : 1;
+        p.pay(GAME_DB.military.rocket.cost);
+        p.rocketCooldown = 4;
+
+        this.log("🚀 ПУСК РАКЕТЫ!", "#c0392b");
+
+        let pvo = false;
+        this.map.flat().forEach(c => {
+            if (c.owner === foe && c.building && c.building.id === 'computer' && Math.abs(c.x-cx) <= 2 && Math.abs(c.y-cy) <= 2) pvo = true;
+        });
+
+        if (pvo) {
+            this.log("🛡️ Вражеская система ПВО перехватила ракету!", "#2980b9");
+        } else {
+            for (let y = cy-1; y <= cy+1; y++) {
+                for (let x = cx-1; x <= cx+1; x++) {
+                    if (y >= 0 && y < 14 && x >= 0 && x < 14) {
+                        let tc = this.map[y][x];
+                        if (tc.building && tc.building.id === 'base') continue;
+                        if (tc.owner > 0 && tc.building) {
+                            let itm = GAME_DB.buildings[tc.building.id];
+                            if (itm && itm.income) for (let r in itm.income) this.players[tc.owner].inc[r] -= itm.income[r];
+                        }
+                        tc.owner = 0; tc.building = null; tc.unit = null; tc.type = 'rad';
+                    }
+                }
+            }
+        }
+        this.done();
+    }
+
+    done() {
+        this.action = 'idle'; this.activeItem = null;
+        document.getElementById('btn-cancel').style.display = 'none';
+        this.refreshUI(); this.render();
+    }
+
+    isNear(x, y, pId) {
+        return [[0,1],[0,-1],[1,0],[-1,0]].some(d => {
+            let nx = x + d[0], ny = y + d[1];
+            return nx >= 0 && nx < 14 && ny >= 0 && ny < 14 && this.map[ny][nx].owner === pId;
+        });
+    }
+
+    next() {
+        if (this.turn === 2 && this.mode === 'bot') return;
+        this.finishTurn();
+    }
+
+    finishTurn() {
+        const p = this.players[this.turn];
+        p.collect();
+
+        this.map.flat().forEach(c => {
+            if (c.owner === this.turn) {
+                if (c.shield > 0) { c.shield--; if (c.shield === 0) c.building = null; }
+                if (c.unit) {
+                    c.unit.moves = c.unit.max;
+                    if (c.unit.id === 'klimep' && c.unit.timer > 0) {
+                        c.unit.timer--;
+                        if (c.unit.timer === 0) {
+                            this.capture(c.x, c.y, this.turn);
+                            c.unit.caps--;
+                            if (c.unit.caps <= 0) c.unit = null;
+                        }
+                    }
+                }
+            }
+        });
+
+        // проверка на победу: остались ли клетки каждого игрока
+        const has1 = this.map.flat().some(c => c.owner === 1);
+        const has2 = this.map.flat().some(c => c.owner === 2);
+        if (!has1 || !has2) {
+            const winner = has1 ? 1 : 2;
+            this.showWin(winner);
+            return; // останавливаем поворот
+        }
+
+        this.turn = this.turn === 1 ? 2 : 1;
+        if (this.turn === 1) this.round++;
+
+        this.refreshUI(); this.render();
+
+        if (this.turn === 2 && this.mode === 'bot') {
+            document.getElementById('btn-end').disabled = true;
+            setTimeout(() => this.aiMove(), 800);
+        } else {
+            document.getElementById('btn-end').disabled = false;
+        }
+    }
+
+    refreshUI() {
+        const t = document.getElementById('turn-msg');
+        t.innerText = `РАУНД ${this.round} — ${this.players[this.turn].name}`;
+        t.style.color = this.players[this.turn].color;
+
+        const update = (id) => {
+            const p = this.players[id];
+            const card = document.getElementById(`card-p${id}`);
+            card.className = `player-box ${this.turn === id ? 'active' : ''}`;
+            card.style.borderLeftColor = p.color;
+            document.getElementById(`res-p${id}`).innerHTML = `
+                <div class="res-pill">💵 ${p.res.money}<span class="inc-text">+${p.inc.money}</span></div>
+                <div class="res-pill">🔩 ${p.res.metal}<span class="inc-text">+${p.inc.metal}</span></div>
+                <div class="res-pill">⚡ ${p.res.energy}<span class="inc-text">+${p.inc.energy}</span></div>
+                <div class="res-pill">💧 ${p.res.water}<span class="inc-text">+${p.inc.water}</span></div>
+            `;
+            document.getElementById(`name-p${id}`).innerText = p.name;
+        };
+        update(1); update(2);
+    }
+
+    // показываем экран победы для указанного игрока
+    showWin(winnerId) {
+        const win = this.players[winnerId];
+        document.getElementById('scr-win').style.display = 'flex';
+        const tt = document.getElementById('winner-title');
+        tt.innerText = `${win.name.toUpperCase()} ПОБЕДИЛ!`;
+        tt.style.color = win.color;
+    }
+
+    quit() {
+        // капитуляция - побеждает другой игрок
+        const loser = this.turn;
+        const winner = loser === 1 ? 2 : 1;
+        this.showWin(winner);
+    }
+
+    countBotBuildings() {
+        const cells = this.map.flat().filter(c => c.owner === 2);
+        let mines = 0, hydros = 0, toys = 0, cloths = 0;
+        
+        for (const c of cells) {
+            if (c.building) {
+                if (c.building.id === 'mine') mines++;
+                else if (c.building.id === 'hydro') hydros++;
+                else if (c.building.id === 'toyFact') toys++;
+                else if (c.building.id === 'clothFact') cloths++;
+            }
+        }
+        return { mines, hydros, toys, cloths };
+    }
+
+    canBotAttack() {
+        if (this.round < 10) return false;
+        const p = this.players[2];
+        const { mines, hydros, toys, cloths } = this.countBotBuildings();
+        // также требуется небольшой денежный запас для наступления
+        if (p.res.money < 500) return false;
+        return mines >= 3 && hydros >= 3 && toys >= 3 && cloths >= 3;
+    }
+
+    // BFS для поиска кратчайшего пути к целевому типу клетки
+    findPathToBFS(targetTypes) {
+        // targetTypes = ['mtn', 'wtr'] или ['enemy']
+        const visited = Array(14).fill(null).map(() => Array(14).fill(false));
+        const queue = [];
+        const botCells = this.map.flat().filter(c => c.owner === 2);
+        
+        // Стартуем с граничных клеток бота
+        for (const c of botCells) {
+            visited[c.y][c.x] = true;
+            queue.push({x: c.x, y: c.y, dist: 0, path: [{x: c.x, y: c.y}]});
+        }
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const dirs = [[-1,0],[0,-1],[1,0],[0,1]];
+
+            for (const d of dirs) {
+                const nx = current.x + d[0];
+                const ny = current.y + d[1];
+
+                if (nx < 0 || nx >= 14 || ny < 0 || ny >= 14 || visited[ny][nx]) continue;
+                visited[ny][nx] = true;
+
+                const cell = this.map[ny][nx];
+                const newPath = [...current.path, {x: nx, y: ny}];
+
+                // Проверяем попадание в цель
+                let found = false;
+                if (targetTypes.includes('mtn') && cell.type === 'mtn') found = true;
+                if (targetTypes.includes('wtr') && cell.type === 'wtr') found = true;
+                if (targetTypes.includes('enemy') && cell.owner === 1) found = true;
+
+                if (found) {
+                    return newPath;
+                }
+
+                // Добавляем новую клетку в очередь (нейтральные и свои)
+                if (cell.owner !== 1) {
+                    queue.push({x: nx, y: ny, dist: current.dist + 1, path: newPath});
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // Получить следующую нейтральную клетку на пути по BFS
+    getNextTerritoryOnPath(path) {
+        if (!path || path.length < 2) return null;
+        // Ищем первую нейтральную клетку в пути, соседнюю к нашей территории
+        for (let i = 1; i < path.length; i++) {
+            const cell = this.map[path[i].y][path[i].x];
+            if (cell.owner === 0) {
+                const prev = this.map[path[i-1].y][path[i-1].x];
+                if (prev.owner === 2) {
+                    return {x: path[i].x, y: path[i].y};
+                }
+            }
+        }
+        return null;
+    }
+
+    async aiMove() {
+        const p = this.players[2];
+        const cells = this.map.flat().filter(c => c.owner === 2);
+        const MONEY_RESERVE = 400;             // сохраняем минимум для фабрик/армии
+        const maxFactoriesEarly = 3;          // до 10-го раунда строим не более трёх фабрик
+        
+        // текущие счётчики зданий
+        let { mines, hydros, toys, cloths } = this.countBotBuildings();
+
+        // ФАЗА 1: До раунда 10 - только экономика и экспансия с путем к ресурсам
+        if (this.round < 10) {
+            // Строим на горах и озерах, но не больше по одной
+            for (const c of cells) {
+                if (!c.building) {
+                    if (c.type === 'wtr' && p.canPay(GAME_DB.buildings.hydro.cost) && hydros < 1) {
+                        this.activeItem = { id: 'hydro', data: GAME_DB.buildings.hydro };
+                        this.doBuild(c.x, c.y); await this.wait(200);
+                        hydros++;
+                        toys = this.countBotBuildings().toys; // обновим на всякий
+                        cloths = this.countBotBuildings().cloths;
+                    } else if (c.type === 'mtn' && p.canPay(GAME_DB.buildings.mine.cost) && mines < 1) {
+                        this.activeItem = { id: 'mine', data: GAME_DB.buildings.mine };
+                        this.doBuild(c.x, c.y); await this.wait(200);
+                        mines++;
+                        toys = this.countBotBuildings().toys;
+                        cloths = this.countBotBuildings().cloths;
+                    }
+                }
+            }
+
+            // Заводы на пустых клетках, не более maxFactoriesEarly с сохранением денег
+            ({ toys, cloths } = this.countBotBuildings());
+            if ((toys + cloths) < maxFactoriesEarly && p.res.money > 200) {
+                const empty = cells.filter(c => c.type === 'plain' && !c.building && !c.unit);
+                if (empty.length > 0) {
+                    let type = (toys + cloths) < (maxFactoriesEarly/2) ? 'toyFact' : 'clothFact';
+                    if (p.canPay(GAME_DB.buildings[type].cost)) {
+                        this.activeItem = { id: type, data: GAME_DB.buildings[type] };
+                        this.doBuild(empty[0].x, empty[0].y); await this.wait(200);
+                        ({ toys, cloths } = this.countBotBuildings());
+                    }
+                }
+            }
+
+            // ВАЖНО: Экспансия по кратчайшему пути, но только пока есть смысл
+            let ex = 2;
+            while (ex > 0 && p.canPay(GAME_DB.buildings.cell.cost) && p.res.money > MONEY_RESERVE) {
+                let path = null;
+                // ищем к ресурсам только если у нас ещё нет нужных зданий
+                if (mines < 1 || hydros < 1) {
+                    path = this.findPathToBFS(['mtn', 'wtr']);
+                }
+                let target = null;
+
+                if (path) {
+                    target = this.getNextTerritoryOnPath(path);
+                }
+
+                if (!target) {
+                    let candidates = this.map.flat().filter(c => c.owner === 0 && this.isNear(c.x, c.y, 2));
+                    if (candidates.length === 0) break;
+                    candidates.sort((a,b) => (a.x + a.y) - (b.x + b.y));
+                    target = candidates[candidates.length - 1];
+                }
+
+                if (target) {
+                    this.activeItem = { id: 'cell', data: GAME_DB.buildings.cell };
+                    this.doBuild(target.x, target.y);
+                }
+                ex--; await this.wait(100);
+            }
+
+        } else {
+            // ФАЗА 2: После раунда 10
+            const { mines, hydros, toys, cloths } = this.countBotBuildings();
+            
+            // оборонная стройка: крепость на границе, если есть враг рядом
+            const enemyBorderCells = this.map.flat().filter(c => c.owner === 2 && !c.building && [[-1,0],[1,0],[0,-1],[0,1]].some(d => {
+                const nx = c.x + d[0], ny = c.y + d[1];
+                return nx>=0 && nx<14 && ny>=0 && ny<14 && this.map[ny][nx].owner === 1;
+            }));
+            if (enemyBorderCells.length > 0 && p.canPay(GAME_DB.military.fortress.cost)) {
+                this.activeItem = { id: 'fortress', data: GAME_DB.military.fortress };
+                const b = enemyBorderCells[0];
+                this.doBuild(b.x, b.y); await this.wait(200);
+            }
+
+            // Продолжаем доставлять до нужного количества
+            if (mines < 3) {
+                for (const c of cells) {
+                    if (!c.building && c.type === 'mtn' && p.canPay(GAME_DB.buildings.mine.cost)) {
+                        this.activeItem = { id: 'mine', data: GAME_DB.buildings.mine };
+                        this.doBuild(c.x, c.y); await this.wait(200);
+                        break;
+                    }
+                }
+            }
+            if (hydros < 3) {
+                for (const c of cells) {
+                    if (!c.building && c.type === 'wtr' && p.canPay(GAME_DB.buildings.hydro.cost)) {
+                        this.activeItem = { id: 'hydro', data: GAME_DB.buildings.hydro };
+                        this.doBuild(c.x, c.y); await this.wait(200);
+                        break;
+                    }
+                }
+            }
+            if (toys < 3) {
+                const empty = cells.filter(c => c.type === 'plain' && !c.building && !c.unit);
+                if (empty.length > 0 && p.canPay(GAME_DB.buildings.toyFact.cost)) {
+                    this.activeItem = { id: 'toyFact', data: GAME_DB.buildings.toyFact };
+                    this.doBuild(empty[0].x, empty[0].y); await this.wait(200);
+                }
+            }
+            if (cloths < 3) {
+                const empty = cells.filter(c => c.type === 'plain' && !c.building && !c.unit);
+                if (empty.length > 0 && p.canPay(GAME_DB.buildings.clothFact.cost)) {
+                    this.activeItem = { id: 'clothFact', data: GAME_DB.buildings.clothFact };
+                    this.doBuild(empty[0].x, empty[0].y); await this.wait(200);
+                }
+            }
+
+            // ЭКСПАНСИЯ К ВРАГУ ЕСЛИ УСЛОВИЯ ВЫПОЛНЕНЫ
+            if (this.canBotAttack()) {
+                // Расширяемся в сторону игрока, но сохраняем резерв
+                let ex = 2;
+                while (ex > 0 && p.canPay(GAME_DB.buildings.cell.cost) && p.res.money > MONEY_RESERVE) {
+                    const pathToEnemy = this.findPathToBFS(['enemy']);
+                    let target = null;
+
+                    if (pathToEnemy) {
+                        target = this.getNextTerritoryOnPath(pathToEnemy);
+                    }
+
+                    if (!target) {
+                        let candidates = this.map.flat().filter(c => c.owner === 0 && this.isNear(c.x, c.y, 2));
+                        if (candidates.length === 0) break;
+                        candidates.sort((a,b) => (a.x + a.y) - (b.x + b.y));
+                        target = candidates[candidates.length - 1];
+                    }
+
+                    if (target) {
+                        this.activeItem = { id: 'cell', data: GAME_DB.buildings.cell };
+                        this.doBuild(target.x, target.y);
+                    }
+                    ex--; await this.wait(100);
+                }
+            } else {
+                // Если нет условий - расширяемся к ресурсам, только пока нужны шахты/ГЭС
+                let ex = 2;
+                while (ex > 0 && p.canPay(GAME_DB.buildings.cell.cost) && p.res.money > MONEY_RESERVE) {
+                    const types = [];
+                    if (mines < 3) types.push('mtn');
+                    if (hydros < 3) types.push('wtr');
+                    const path = types.length ? this.findPathToBFS(types) : null;
+                    let target = null;
+
+                    if (path) {
+                        target = this.getNextTerritoryOnPath(path);
+                    }
+
+                    if (!target) {
+                        let candidates = this.map.flat().filter(c => c.owner === 0 && this.isNear(c.x, c.y, 2));
+                        if (candidates.length === 0) break;
+                        candidates.sort((a,b) => (a.x + a.y) - (b.x + b.y));
+                        target = candidates[candidates.length - 1];
+                    }
+
+                    if (target) {
+                        this.activeItem = { id: 'cell', data: GAME_DB.buildings.cell };
+                        this.doBuild(target.x, target.y);
+                    }
+                    ex--; await this.wait(100);
+                }
+            }
+
+            // Спавн боевых юнитов
+            // если противник уже копает рядом с нашей территорией — делаем приоритетную защиту
+            const enemyBorder = this.map.flat().some(c => c.owner === 2 && [[-1,0],[1,0],[0,-1],[0,1]].some(d => {
+                const nx = c.x + d[0], ny = c.y + d[1];
+                return nx>=0 && nx<14 && ny>=0 && ny<14 && this.map[ny][nx].owner === 1;
+            }));
+
+            if (enemyBorder && p.canPay(GAME_DB.military.army.cost)) {
+                const spts = cells.filter(c => !c.unit && c.owner === 2);
+                if (spts.length > 0) {
+                    this.activeItem = { id: 'army', data: GAME_DB.military.army };
+                    this.doSpawn(spts[0].x, spts[0].y); await this.wait(200);
+                }
+            } else if (this.canBotAttack()) {
+                // Есть достаточно ресурсов - ставим танки и климепы для наступления
+                const spts = cells.filter(c => !c.unit && c.owner === 2);
+                if (spts.length > 0 && p.res.money > 500) {
+                    let type = p.res.money > 1200 ? 'tank' : 'klimep';
+                    if (p.canPay(GAME_DB.military[type].cost)) {
+                        this.activeItem = { id: type, data: GAME_DB.military[type] };
+                        this.doSpawn(spts[0].x, spts[0].y); await this.wait(200);
+                    }
+                }
+            } else {
+                // Нет условий — максимум 2 армии для обороны
+                const army_count = this.map.flat().filter(c => c.unit && c.unit.id === 'army' && c.owner === 2).length;
+                if (army_count < 2) {
+                    const spts = cells.filter(c => !c.unit && c.owner === 2);
+                    if (spts.length > 0 && p.canPay(GAME_DB.military.army.cost)) {
+                        this.activeItem = { id: 'army', data: GAME_DB.military.army };
+                        this.doSpawn(spts[0].x, spts[0].y); await this.wait(200);
+                    }
+                }
+            }
+        }
+
+        // Движение юнитов
+        const us = this.map.flat().filter(c => c.unit && c.owner === 2);
+        const enemyCells = this.map.flat().filter(c => c.owner === 1);
+        const distToEnemy = (x,y) => {
+            if (enemyCells.length === 0) return Infinity;
+            return enemyCells.reduce((m,ec) => Math.min(m, Math.abs(x-ec.x)+Math.abs(y-ec.y)), Infinity);
+        };
+
+        for (let uc of us) {
+            let cx = uc.x, cy = uc.y;
+            while (true) {
+                const cell = this.map[cy][cx];
+                if (!cell.unit || cell.unit.moves <= 0) break;
+                let moved = false;
+                let ds = [[-1, 0], [0, -1], [1, 0], [0, 1]].sort((a,b) => 
+                    distToEnemy(cx+a[0], cy+a[1]) - distToEnemy(cx+b[0], cy+b[1])
+                );
+                for (let d of ds) {
+                    let nx = cx + d[0], ny = cy + d[1];
+                    if (nx>=0 && nx<14 && ny>=0 && ny<14) {
+                        this.selected = { x: cx, y: cy };
+                        this.action = 'move';
+                        this.doMove(nx, ny);
+                        if (!this.map[cy][cx].unit) {
+                            cx = nx; cy = ny;
+                            moved = true;
+                            break;
+                        }
+                    }
+                }
+                if (!moved) break;
+                await this.wait(200);
+            }
+        }
+
+        await this.wait(400);
+        this.finishTurn();
+    }
+
+    wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+}
+
+let world;
+function startEngine() {
+    document.getElementById('scr-menu').style.display = 'none';
+    document.documentElement.style.setProperty('--p1-color', COLORS[cP1].h);
+    document.documentElement.style.setProperty('--p2-color', COLORS[cP2].h);
+    world = new Engine(gameMode);
+}
+</script>
+</body>
+</html>

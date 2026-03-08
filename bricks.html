@@ -1,0 +1,1271 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Break Bricks</title>
+    <style>
+        /* =========================================
+           CSS СТИЛИ И ИНТЕРФЕЙС
+           ========================================= */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: #0a0a0a;
+            box-shadow: 0 0 40px rgba(0, 210, 255, 0.2);
+            border: 2px solid #333;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 75px;
+            margin-bottom: 50px;
+            color: #00d2ff;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            text-shadow: 0 0 25px #00d2ff;
+            text-align: center;
+            line-height: 1.1;
+        }
+
+        h2 {
+            font-size: 45px;
+            margin-bottom: 30px;
+            color: #ffcc00;
+            text-shadow: 0 0 15px #ffcc00;
+        }
+
+        .btn {
+            padding: 15px 45px;
+            margin: 12px;
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #fff;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 25px #fff;
+            transform: translateY(-3px);
+        }
+
+        .btn-blue { border-color: #00d2ff; color: #00d2ff; }
+        .btn-blue:hover { background: #00d2ff; color: #000; box-shadow: 0 0 25px #00d2ff; }
+
+        .btn-yellow { border-color: #ffcc00; color: #ffcc00; }
+        .btn-yellow:hover { background: #ffcc00; color: #000; box-shadow: 0 0 25px #ffcc00; }
+
+        #level-selector { justify-content: flex-start; padding-top: 40px; }
+
+        #level-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 12px;
+            width: 90%;
+            max-height: 420px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .level-btn {
+            padding: 12px 0;
+            font-size: 20px;
+            font-weight: bold;
+            background: #111;
+            border: 2px solid #444;
+            color: #aaa;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+
+        .level-btn:hover {
+            background: #00d2ff;
+            color: #000;
+            border-color: #00d2ff;
+            box-shadow: 0 0 15px #00d2ff;
+            transform: scale(1.1);
+            z-index: 2;
+        }
+
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 22px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        #ball-count-display { color: #ffcc00; }
+        
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #111; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00d2ff; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div id="hud" class="hidden">
+        <div>Очки: <span id="scoreVal" style="color:#00d2ff;">0</span></div>
+        <div id="ball-count-display">Шариков: <span id="ballsVal">1</span></div>
+        <div>Уровень: <span id="levelVal" style="color:#00ffaa;">1</span></div>
+        <div>Жизни: <span id="livesVal" style="color:#ff0055;">3</span></div>
+    </div>
+
+    <div id="main-menu" class="screen">
+        <h1>Break Bricks</h1>
+        <button class="btn btn-blue" onclick="startGame(0)">Начать игру</button>
+        <button class="btn btn-yellow" onclick="showLevelSelector()">Выбор уровня</button>
+    </div>
+
+    <div id="level-selector" class="screen hidden">
+        <h2 style="font-size: 35px; color:#fff;">Выберите уровень</h2>
+        <div id="level-grid"></div>
+        <button class="btn" style="margin-top: 20px; font-size: 18px; padding: 10px 30px;" onclick="showMainMenu()">В главное меню</button>
+    </div>
+
+    <div id="pause-screen" class="screen hidden">
+        <h2>ПАУЗА</h2>
+        <button class="btn btn-blue" onclick="togglePause()">Продолжить</button>
+        <button class="btn" onclick="quitToMenu()">Выйти в меню</button>
+    </div>
+
+    <div id="game-over" class="screen hidden">
+        <h2 style="color: #ff0055;">ИГРА ОКОНЧЕНА</h2>
+        <p style="font-size: 24px;">Итоговые очки: <span id="final-score" style="color:#00d2ff; font-weight:bold;">0</span></p>
+        <button class="btn btn-blue" onclick="restartLevel()">Попробовать снова</button>
+        <button class="btn" onclick="quitToMenu()">В меню</button>
+    </div>
+
+    <div id="level-complete" class="screen hidden">
+        <h2 style="color: #00ffaa;">УРОВЕНЬ ПРОЙДЕН!</h2>
+        <button class="btn btn-blue" onclick="nextLevel()">Следующий уровень</button>
+        <button class="btn" onclick="quitToMenu()">В меню</button>
+    </div>
+</div>
+
+<script>
+    /* =========================================
+       МАССИВ УРОВНЕЙ (ПОЛНЫЙ СПИСОК ИЗ 50 УРОВНЕЙ)
+       0 - пусто, 1 - Синий (Обычный), 2 - Красный (+3 шара), 3 - Желтый (x2 шары)
+       ========================================= */
+    const LEVEL_DATA = [
+        // Уровень 1
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,2,1,1,3,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 2
+        [ 
+            [1,0,1,0,1,0,1,0,1,0,1], 
+            [0,1,1,2,1,1,1,3,1,1,0], 
+            [1,0,1,0,1,0,1,0,1,0,1] 
+        ],
+        // Уровень 3
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [2,0,0,0,0,0,0,0,0,3], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 4
+        [ 
+            [0,0,1,1,1,1,1,1,0,0], 
+            [0,1,2,1,1,1,1,3,1,0], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,0,0,0,0,0,0,1,1] 
+        ],
+        // Уровень 5
+        [ 
+            [1,2,1], 
+            [1,1,1,1,1], 
+            [1,1,3,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 6
+        [ 
+            [3,1,1,1,1,1,1,1,1,2], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,0,0,0,0,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 7
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,2,1,2,1,2,1,2,1,2], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 8
+        [ 
+            [2,2,2,2,2,2,2,2,2,2], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [3,3,3,3,3,3,3,3,3,3] 
+        ],
+        // Уровень 9
+        [ 
+            [1,1,1,1,0,0,1,1,1,1], 
+            [1,2,1,1,0,0,1,1,3,1], 
+            [1,1,1,1,0,0,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 10
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,2,1,1,1,1,1,1,1,1,2,1], 
+            [1,1,1,1,3,1,1,3,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 11
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,0,1,0,1,0,1,0,1,0], 
+            [0,1,2,1,3,1,2,1,3,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 12
+        [ 
+            [1,1,0,1,1,1,1,0,1,1], 
+            [1,1,0,1,1,1,1,0,1,1], 
+            [1,1,0,1,2,3,1,0,1,1], 
+            [1,1,0,1,1,1,1,0,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 13
+        [ 
+            [3,1,3,1,3,1,3,1,3,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [2,1,2,1,2,1,2,1,2,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 14
+        [ 
+            [0,0,1,1,1,1,1,1,0,0], 
+            [0,1,1,1,1,1,1,1,1,0], 
+            [1,1,1,2,1,1,3,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 15
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [2,0,0,0,0,0,0,0,0,2], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [3,0,0,0,0,0,0,0,0,3], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 16
+        [ 
+            [1,0,1,0,1,0,1,0,1,0], 
+            [0,1,0,1,0,1,0,1,0,1], 
+            [1,0,1,2,1,3,1,2,1,0], 
+            [0,1,0,1,0,1,0,1,0,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 17
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,2,1,1,1,1,1,1,2,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,3,1,1,1,1,1,1,3,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 18
+        [ 
+            [0,0,0,1,1,1,1,0,0,0], 
+            [0,0,1,1,2,3,1,1,0,0], 
+            [0,1,1,1,1,1,1,1,1,0], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 19
+        [ 
+            [1,1,1,1,1,1,1,1,1,1], 
+            [1,0,0,0,0,0,0,0,0,1], 
+            [1,0,1,1,1,1,1,1,0,1], 
+            [1,0,2,3,1,1,3,2,0,1], 
+            [1,0,1,1,1,1,1,1,0,1], 
+            [1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 20
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,2,1,1,3,1,3,1,1,2,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 21
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [2,1,1,1,3,3,1,1,1,2], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 22
+        [ 
+            [1,0,1,0,1,0,1,0,1,0,1,0], 
+            [0,1,0,1,0,1,0,1,0,1,0,1], 
+            [1,0,1,0,1,0,1,0,1,0,1,0], 
+            [0,2,0,3,0,1,1,0,3,0,2,0], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 23
+        [ 
+            [2,2,2,2,2,2,2,2,2,2,2,2], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [3,3,3,3,3,3,3,3,3,3,3,3] 
+        ],
+        // Уровень 24
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,2,1,1,1,1,1,1,1,1,2,1], 
+            [1,1,1,1,3,1,1,3,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 25
+        [ 
+            [1,0,0,1,0,0,1,0,0,1,0,0], 
+            [1,2,0,1,3,0,1,2,0,1,3,0], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 26
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [2,2,3,3,2,2,3,3,2,2,3,3] 
+        ],
+        // Уровень 27
+        [ 
+            [0,0,0,0,1,1,1,1,0,0,0,0], 
+            [0,0,0,1,1,1,1,1,1,0,0,0], 
+            [0,0,1,1,2,3,3,2,1,1,0,0], 
+            [0,1,1,1,1,1,1,1,1,1,1,0], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 28
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,0,0,0,0,0,0,0,0,0,0,1], 
+            [1,0,1,1,1,1,1,1,1,1,0,1], 
+            [1,0,1,2,3,1,1,3,2,1,0,1], 
+            [1,0,1,1,1,1,1,1,1,1,0,1], 
+            [1,0,0,0,0,0,0,0,0,0,0,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 29
+        [ 
+            [1,2,3,1,2,3,1,2,3,1,2,3], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 30
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,2,2,3,3,2,2,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 31
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [2,1,1,1,1,3,1,3,1,1,1,1,1,2] 
+        ],
+        // Уровень 32
+        [ 
+            [1,0,1,0,1,0,1,0,1,0,1,0,1,0], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [0,1,0,1,0,1,0,1,0,1,0,1,0,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,0,1,0,2,0,3,0,2,0,1,0,1,0], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 33
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [2,2,2,1,1,1,1,1,1,1,1,2,2,2], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [3,3,3,1,1,1,1,1,1,1,1,3,3,3], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 34
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [2,3,2,3,2,3,2,3,2,3,2,3,2,3] 
+        ],
+        // Уровень 35
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,1], 
+            [1,0,1,1,1,1,1,1,1,1,1,1,0,1], 
+            [1,0,1,0,0,0,0,0,0,0,0,1,0,1], 
+            [1,0,1,0,1,2,3,3,2,1,0,1,0,1], 
+            [1,0,1,0,1,1,1,1,1,1,0,1,0,1], 
+            [1,0,1,1,1,1,1,1,1,1,1,1,0,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 36
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 37
+        [ 
+            [2,1,1,1,1,1,1,1,1,1,1,1,1,2], 
+            [1,3,1,1,1,1,1,1,1,1,1,1,3,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 38
+        [ 
+            [0,0,0,1,1,1,1,1,1,1,1,0,0,0], 
+            [0,0,1,1,1,1,1,1,1,1,1,1,0,0], 
+            [0,1,1,1,1,2,3,3,2,1,1,1,1,0], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 39
+        [ 
+            [1,2,1,2,1,2,1,2,1,2,1,2,1,2], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [3,1,3,1,3,1,3,1,3,1,3,1,3,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 40
+        [ 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,2,2,3,3,3,3,2,2,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1] 
+        ],
+        // Уровень 41
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [2,1,1,1,1,1,1,3,3,1,1,1,1,1,1,2]
+        ],
+        // Уровень 42
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ],
+        // Уровень 43
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,2,1,1,1,1,1,1,2,1,1,1,1]
+        ],
+        // Уровень 44
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ],
+        // Уровень 45
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3]
+        ],
+        // Уровень 46
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ],
+        // Уровень 47
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,2,1,1,2,1,1,1,1,1,1]
+        ],
+        // Уровень 48
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ],
+        // Уровень 49
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,3,1,1,1,1,1,1,3,1,1,1,1]
+        ],
+        // Уровень 50 (ФИНАЛЬНЫЙ БОСС - ИСПРАВЛЕННЫЙ)
+        [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1],
+            [1,1,1,1,1,1,1,3,3,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ]
+    ];
+
+    /* =========================================
+       НАСТРОЙКИ, АУДИО И ПЕРЕМЕННЫЕ ИГРЫ
+       ========================================= */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let audioCtx = null;
+    function playSound(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        if (type === 'hit') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'powerup') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.2);
+            gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
+        } else if (type === 'paddle') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+    }
+
+    let gameState = 'MENU';
+    let currentLevel = 0;
+    let score = 0;
+    let lives = 3;
+
+    let paddle;
+    let balls = [];
+    let bricks = [];
+    let powerUps = [];
+    let particles = [];
+
+    let rightPressed = false;
+    let leftPressed = false;
+
+    const COLOR_NORMAL = '#00d2ff';
+    const COLOR_ADD_BALLS = '#ff0055';
+    const COLOR_MULTI_BALLS = '#ffcc00';
+
+    /* =========================================
+       КЛАССЫ ИГРЫ
+       ========================================= */
+    class Paddle {
+        constructor() {
+            this.width = 120;
+            this.height = 15;
+            this.x = (canvas.width - this.width) / 2;
+            this.y = canvas.height - 40;
+            this.speed = 10;
+            this.color = '#ffffff';
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.roundRect(this.x, this.y, this.width, this.height, 8);
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = this.color;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.closePath();
+        }
+        move() {
+            if (rightPressed && this.x < canvas.width - this.width) this.x += this.speed;
+            else if (leftPressed && this.x > 0) this.x -= this.speed;
+        }
+    }
+
+    class Ball {
+        constructor(x, y, dx, dy) {
+            this.radius = 5.5;
+            this.x = x || canvas.width / 2;
+            this.y = y || canvas.height - 60;
+            this.speed = 6 + (currentLevel * 0.1); 
+            
+            if (dx === undefined || dy === undefined) {
+                let angle = Math.random() * Math.PI/2 - Math.PI/4; 
+                this.dx = this.speed * Math.sin(angle);
+                this.dy = -this.speed * Math.cos(angle);
+            } else {
+                this.dx = dx;
+                this.dy = dy;
+            }
+            this.color = '#ffffff';
+            this.speedMultiplier = 1.0; 
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.closePath();
+        }
+        move() {
+            if (this.speedMultiplier < 1.5) {
+                this.speedMultiplier += 0.0001; 
+            }
+
+            this.x += this.dx * this.speedMultiplier;
+            this.y += this.dy * this.speedMultiplier;
+
+            if (this.x + (this.dx * this.speedMultiplier) > canvas.width - this.radius || this.x + (this.dx * this.speedMultiplier) < this.radius) {
+                this.dx = -this.dx;
+                playSound('hit');
+            }
+            if (this.y + (this.dy * this.speedMultiplier) < this.radius) {
+                this.dy = -this.dy;
+                playSound('hit');
+            }
+        }
+    }
+
+    class Brick {
+        constructor(x, y, w, h, type) {
+            this.x = x;
+            this.y = y;
+            this.width = w;
+            this.height = h;
+            this.type = type; 
+            this.status = 1; 
+            
+            if (this.type === 1) this.color = COLOR_NORMAL;
+            else if (this.type === 2) this.color = COLOR_ADD_BALLS;
+            else if (this.type === 3) this.color = COLOR_MULTI_BALLS;
+        }
+        draw() {
+            if (this.status === 1) {
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y, this.width, this.height, 4);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                
+                if (this.type === 2 || this.type === 3) {
+                    ctx.fillStyle = '#111';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.type === 2 ? '+3' : 'x2', this.x + this.width/2, this.y + this.height/2);
+                }
+                ctx.closePath();
+            }
+        }
+    }
+
+    class PowerUp {
+        constructor(x, y, type) {
+            this.x = x;
+            this.y = y;
+            this.width = 36;
+            this.height = 18;
+            this.dy = 3.5; 
+            this.type = type; 
+            this.color = type === 'add_balls' ? COLOR_ADD_BALLS : COLOR_MULTI_BALLS;
+            this.text = type === 'add_balls' ? '+3' : 'x2';
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.roundRect(this.x, this.y, this.width, this.height, 9);
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = this.color;
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.text, this.x + this.width/2, this.y + this.height/2);
+            ctx.shadowBlur = 0;
+            ctx.closePath();
+        }
+        move() { this.y += this.dy; }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.dx = (Math.random() - 0.5) * 12;
+            this.dy = (Math.random() - 0.5) * 12;
+            this.size = Math.random() * 4 + 1;
+            this.color = color;
+            this.life = 1.0; 
+            this.decay = Math.random() * 0.05 + 0.02;
+        }
+        draw() {
+            ctx.globalAlpha = this.life;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.closePath();
+            ctx.globalAlpha = 1.0;
+        }
+        update() {
+            this.x += this.dx;
+            this.y += this.dy;
+            this.life -= this.decay;
+        }
+    }
+
+    /* =========================================
+       ОБРАБОТКА ВВОДА
+       ========================================= */
+    document.addEventListener("keydown", keyDownHandler, false);
+    document.addEventListener("keyup", keyUpHandler, false);
+    document.addEventListener("mousemove", mouseMoveHandler, false);
+
+    function keyDownHandler(e) {
+        if (e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
+        else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
+        if (e.key === "Escape" && (gameState === 'PLAYING' || gameState === 'PAUSED')) togglePause();
+    }
+    function keyUpHandler(e) {
+        if (e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
+        else if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
+    }
+    function mouseMoveHandler(e) {
+        if (gameState !== 'PLAYING') return;
+        let relativeX = e.clientX - canvas.getBoundingClientRect().left;
+        if (relativeX > 0 && relativeX < canvas.width) {
+            paddle.x = relativeX - paddle.width / 2;
+        }
+    }
+
+    /* =========================================
+       ЛОГИКА ИГРЫ
+       ========================================= */
+    function initLevel(lvlIndex) {
+        currentLevel = lvlIndex;
+        paddle = new Paddle();
+        balls = [new Ball()];
+        bricks = [];
+        powerUps = [];
+        particles = [];
+
+        let layout = LEVEL_DATA[lvlIndex];
+        let rowCount = layout.length;
+        
+        let maxCols = 0;
+        for (let r = 0; r < rowCount; r++) {
+            if (layout[r].length > maxCols) maxCols = layout[r].length;
+        }
+        
+        let brickPadding = 5;
+        let offsetTop = 70;
+        let offsetLeft = 20;
+        
+        let availableWidth = canvas.width - (offsetLeft * 2);
+        let brickWidth = (availableWidth - (maxCols - 1) * brickPadding) / maxCols;
+        let brickHeight = 22;
+
+        for (let r = 0; r < rowCount; r++) {
+            let rowCols = layout[r].length;
+            let rowOffsetLeft = offsetLeft + (availableWidth - (rowCols * brickWidth + (rowCols - 1) * brickPadding)) / 2;
+            
+            for (let c = 0; c < rowCols; c++) {
+                let type = layout[r][c];
+                if (type > 0) {
+                    let brickX = rowOffsetLeft + (c * (brickWidth + brickPadding));
+                    let brickY = offsetTop + (r * (brickHeight + brickPadding));
+                    bricks.push(new Brick(brickX, brickY, brickWidth, brickHeight, type));
+                }
+            }
+        }
+        updateHUD();
+    }
+
+    function createExplosion(x, y, color) {
+        for (let i = 0; i < 15; i++) particles.push(new Particle(x, y, color));
+    }
+
+    function spawnPowerUp(x, y, typeId) {
+        if (typeId === 2) powerUps.push(new PowerUp(x, y, 'add_balls'));
+        else if (typeId === 3) powerUps.push(new PowerUp(x, y, 'multiplier'));
+    }
+
+    function handleCollisions() {
+        for (let i = 0; i < balls.length; i++) {
+            let b = balls[i];
+
+            if (b.dy > 0 && b.y + b.radius > paddle.y && b.y - b.radius < paddle.y + paddle.height) {
+                if (b.x > paddle.x && b.x < paddle.x + paddle.width) {
+                    playSound('paddle');
+                    let hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                    let angle = hitPoint * (Math.PI / 2.5); 
+                    let currentSpeed = Math.sqrt(b.dx*b.dx + b.dy*b.dy);
+                    
+                    b.dx = currentSpeed * Math.sin(angle);
+                    b.dy = -currentSpeed * Math.cos(angle);
+                    b.y = paddle.y - b.radius;
+                }
+            }
+
+            for (let j = 0; j < bricks.length; j++) {
+                let br = bricks[j];
+                if (br.status === 1) {
+                    if (b.x + b.radius > br.x && b.x - b.radius < br.x + br.width &&
+                        b.y + b.radius > br.y && b.y - b.radius < br.y + br.height) {
+                        
+                        playSound('hit');
+
+                        let overlapLeft = (b.x + b.radius) - br.x;
+                        let overlapRight = (br.x + br.width) - (b.x - b.radius);
+                        let overlapTop = (b.y + b.radius) - br.y;
+                        let overlapBottom = (br.y + br.height) - (b.y - b.radius);
+
+                        let minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+                        if (minOverlap === overlapTop || minOverlap === overlapBottom) b.dy = -b.dy;
+                        else b.dx = -b.dx;
+
+                        br.status = 0;
+                        score += 10;
+                        updateHUD();
+                        createExplosion(br.x + br.width/2, br.y + br.height/2, br.color);
+                        
+                        if (br.type === 2 || br.type === 3) {
+                            spawnPowerUp(br.x + br.width/2 - 18, br.y, br.type);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (let i = powerUps.length - 1; i >= 0; i--) {
+            let p = powerUps[i];
+            if (p.y + p.height > paddle.y && p.y < paddle.y + paddle.height &&
+                p.x + p.width > paddle.x && p.x < paddle.x + paddle.width) {
+                
+                playSound('powerup');
+                let baseSpeed = 6 + (currentLevel * 0.1);
+
+                if (p.type === 'add_balls') {
+                    balls.push(new Ball(paddle.x + paddle.width/2, paddle.y - 10, -baseSpeed*0.7, -baseSpeed*0.7));
+                    balls.push(new Ball(paddle.x + paddle.width/2, paddle.y - 10, 0, -baseSpeed));
+                    balls.push(new Ball(paddle.x + paddle.width/2, paddle.y - 10, baseSpeed*0.7, -baseSpeed*0.7));
+                    score += 50;
+                } else if (p.type === 'multiplier') {
+                    let currentBallsCount = balls.length;
+                    let limit = Math.min(currentBallsCount, 250 - currentBallsCount);
+                    
+                    for (let b = 0; b < limit; b++) {
+                        let oldBall = balls[b];
+                        balls.push(new Ball(oldBall.x, oldBall.y, -oldBall.dx, oldBall.dy));
+                    }
+                    score += 100;
+                    
+                    paddle.color = COLOR_MULTI_BALLS;
+                    setTimeout(() => paddle.color = '#ffffff', 400);
+                }
+                
+                updateHUD();
+                powerUps.splice(i, 1);
+            } else if (p.y > canvas.height) {
+                powerUps.splice(i, 1);
+            }
+        }
+    }
+
+    function checkWinLose() {
+        for (let i = balls.length - 1; i >= 0; i--) {
+            if (balls[i].y > canvas.height) {
+                balls.splice(i, 1);
+                updateHUD();
+            }
+        }
+
+        if (balls.length === 0) {
+            lives--;
+            updateHUD();
+            if (lives <= 0) {
+                gameState = 'GAMEOVER';
+                document.getElementById('final-score').innerText = score;
+                document.getElementById('game-over').classList.remove('hidden');
+                document.getElementById('hud').classList.add('hidden');
+            } else {
+                paddle.x = (canvas.width - paddle.width) / 2;
+                balls = [new Ball(paddle.x + paddle.width/2, paddle.y - 10)];
+                updateHUD();
+            }
+        }
+
+        let isWon = true;
+        for (let i = 0; i < bricks.length; i++) {
+            if (bricks[i].status === 1) {
+                isWon = false;
+                break;
+            }
+        }
+
+        if (isWon) {
+            gameState = 'LEVEL_COMPLETE';
+            document.getElementById('level-complete').classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+        }
+    }
+
+    /* =========================================
+       ОСНОВНОЙ ИГРОВОЙ ЦИКЛ
+       ========================================= */
+    function update() {
+        if (gameState !== 'PLAYING') return;
+        paddle.move();
+        for (let b of balls) b.move();
+        for (let p of powerUps) p.move();
+        
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+
+        handleCollisions();
+        checkWinLose();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (gameState === 'MENU') return;
+
+        for (let br of bricks) br.draw();
+        for (let p of powerUps) p.draw();
+        for (let pt of particles) pt.draw();
+        paddle.draw();
+        for (let b of balls) b.draw();
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    /* =========================================
+       УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ
+       ========================================= */
+    function updateHUD() {
+        document.getElementById('scoreVal').innerText = score;
+        document.getElementById('ballsVal').innerText = balls.length;
+        document.getElementById('levelVal').innerText = currentLevel + 1;
+        document.getElementById('livesVal').innerText = lives;
+    }
+
+    function initAudio() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function startGame(lvl) {
+        initAudio();
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('level-selector').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('level-complete').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        
+        lives = 3;
+        score = 0;
+        initLevel(lvl);
+        gameState = 'PLAYING';
+    }
+
+    function restartLevel() {
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        lives = 3;
+        score = 0;
+        initLevel(currentLevel);
+        gameState = 'PLAYING';
+    }
+
+    function nextLevel() {
+        document.getElementById('level-complete').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        
+        if (currentLevel < LEVEL_DATA.length - 1) {
+            initLevel(currentLevel + 1);
+            gameState = 'PLAYING';
+        } else {
+            alert("НЕВЕРОЯТНО! Ты прошел все 50 уровней!");
+            showMainMenu();
+        }
+    }
+
+    function quitToMenu() {
+        document.getElementById('pause-screen').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('level-complete').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        showMainMenu();
+    }
+
+    function togglePause() {
+        if (gameState === 'PLAYING') {
+            gameState = 'PAUSED';
+            document.getElementById('pause-screen').classList.remove('hidden');
+        } else if (gameState === 'PAUSED') {
+            gameState = 'PLAYING';
+            document.getElementById('pause-screen').classList.add('hidden');
+        }
+    }
+
+    function showMainMenu() {
+        gameState = 'MENU';
+        document.getElementById('main-menu').classList.remove('hidden');
+        document.getElementById('level-selector').classList.add('hidden');
+        ctx.clearRect(0, 0, canvas.width, canvas.height); 
+    }
+
+    function showLevelSelector() {
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('level-selector').classList.remove('hidden');
+    }
+
+    function buildLevelGrid() {
+        const grid = document.getElementById('level-grid');
+        grid.innerHTML = '';
+        for (let i = 0; i < LEVEL_DATA.length; i++) {
+            let btn = document.createElement('button');
+            btn.className = 'level-btn';
+            btn.innerText = i + 1;
+            if ((i + 1) % 10 === 0) {
+                btn.style.color = '#ffcc00';
+                btn.style.borderColor = '#ffcc00';
+            }
+            btn.onclick = () => startGame(i);
+            grid.appendChild(btn);
+        }
+    }
+
+    buildLevelGrid();
+    requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

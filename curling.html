@@ -1,0 +1,1498 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curling</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* -----------------------------------------------------------
+           1. БАЗОВЫЕ СТИЛИ И ПЕРЕМЕННЫЕ (UI/UX)
+           ----------------------------------------------------------- */
+        :root {
+            --bg-color: #0a0e17;
+            --ice-color: #e3f2fd;
+            --house-red: #ff1744;
+            --house-blue: #2979ff;
+            --house-white: #ffffff;
+            --text-color: #ffffff;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --neon-blue: #00e5ff;
+            --neon-red: #ff1744;
+            --shadow-neon: 0 0 15px rgba(0, 229, 255, 0.5);
+            --transition: all 0.3s ease;
+            --font-main: 'Poppins', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none; /* Запрет выделения текста */
+        }
+
+        /* Основной контейнер игры */
+        #gameWrapper {
+            position: relative;
+            width: 600px;
+            height: 850px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--panel-border);
+        }
+
+        /* Холст отрисовки */
+        canvas {
+            display: block;
+            background: var(--ice-color);
+            cursor: default;
+        }
+
+        /* -----------------------------------------------------------
+           2. СТИЛИ ИНТЕРФЕЙСА (HUD, МЕНЮ)
+           ----------------------------------------------------------- */
+        
+        /* Общие стили для оверлеев (меню, экраны конца) */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 14, 23, 0.85);
+            backdrop-filter: blur(10px); /* Эффект размытия фона */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        /* Заголовки */
+        h1 {
+            font-size: 56px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            background: linear-gradient(135deg, #fff 0%, var(--neon-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: var(--shadow-neon);
+            letter-spacing: -2px;
+        }
+
+        h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: rgba(255,255,255,0.8);
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 400;
+            margin: 20px 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        /* Стили кнопок меню (вместо радио) */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .option-btn {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            padding: 12px 24px;
+            color: rgba(255,255,255,0.7);
+            font-family: var(--font-main);
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .option-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .option-btn.active {
+            background: var(--neon-blue);
+            color: #000;
+            border-color: var(--neon-blue);
+            box-shadow: var(--shadow-neon);
+        }
+
+        /* Большая кнопка старта */
+        .start-btn {
+            margin-top: 40px;
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            padding: 18px 60px;
+            color: var(--neon-blue);
+            font-family: var(--font-main);
+            font-size: 20px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .start-btn:hover {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.8);
+        }
+
+        /* Панель счета (HUD) */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%;
+            height: 60px; // уменьшен HUD
+            padding: 0 30px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(10,14,23,0.9) 0%, rgba(10,14,23,0) 100%);
+            z-index: 10;
+            pointer-events: none; /* Чтобы не мешало кликам по льду */
+            transition: opacity 0.3s ease;
+        }
+
+        #hud.hidden { opacity: 0; }
+
+        .score-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .score-box {
+            font-size: 32px;
+            font-weight: 800;
+            padding: 5px 15px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid transparent;
+        }
+
+        #scoreRed { color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); border-color: rgba(255,23,68,0.3); }
+        #scoreBlue { color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); border-color: rgba(0,229,255,0.3); }
+
+        .team-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.7); margin-bottom: 2px; }
+
+        #turnIndicator {
+            text-align: center;
+            background: var(--panel-bg);
+            backdrop-filter: blur(5px);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--panel-border);
+        }
+
+        #currentTurnText { font-size: 16px; font-weight: 600; }
+        #stonesLeftText { font-size: 12px; color: rgba(255,255,255,0.6); }
+
+        /* Экран конца раунда */
+        #endMessage { font-size: 28px; color: #fff; margin-bottom: 30px; text-align: center; }
+        .action-btn {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            padding: 15px 40px;
+            color: #fff;
+            font-family: var(--font-main);
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            transition: var(--transition);
+        }
+        .action-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+        .prominent-btn { border-color: var(--neon-blue); color: var(--neon-blue); font-weight: 600; }
+        .prominent-btn:hover { background: var(--neon-blue); color: #000; }
+
+    </style>
+</head>
+<body>
+
+<div id="gameWrapper">
+    <div id="hud" class="hidden">
+        <div class="score-display">
+            <div class="team-label">Красные</div>
+            <div id="scoreRed" class="score-box">0</div>
+        </div>
+        <div id="turnIndicator">
+            <div id="currentTurnText">Ход: Красные</div>
+            <div id="stonesLeftText">Камней: 8/8</div>
+        </div>
+        <div class="score-display">
+            <div class="team-label">Синие</div>
+            <div id="scoreBlue" class="score-box">0</div>
+        </div>
+    </div>
+
+    <div id="mainMenu" class="overlay">
+        <h1>CURLING</h1>
+
+        <h3>Режим игры</h3>
+        <div class="button-group" id="modeGroup">
+            <button class="option-btn active" data-value="bot">Против Бота</button>
+            <button class="option-btn" data-value="pvp">2 Игрока</button>
+        </div>
+
+        <h3>Сложность (Стрелка)</h3>
+        <div class="button-group" id="diffGroup">
+            <button class="option-btn" data-value="1">Легко</button>
+            <button class="option-btn active" data-value="2">Норма+</button>
+            <button class="option-btn" data-value="3">ХАРД</button>
+        </div>
+
+        <button class="start-btn" onclick="Game.ui.startInput()">Играть</button>
+    </div>
+
+    <div id="endScreen" class="overlay hidden">
+        <h1 id="endTitle">Раунд завершен!</h1>
+        <div id="endMessage">Красные получают 2 очка</div>
+        <div style="display:flex;">
+            <button class="action-btn prominent-btn" id="nextRndBtn" onclick="Game.logic.restartGame()">Следующий раунд</button>
+            <button class="action-btn" onclick="Game.ui.showMenu()">В меню</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="850"></canvas>
+</div>
+
+<script>
+/**
+ * ==========================================================================================
+ * CURLING PRO MAX - EXTREME EDITION
+ * Полностью переписанный движок. Масштаб > 1000 строк.
+ * Включает: Физику с бортиками, Продвинутый ИИ, Частицы, Систему UI.
+ * ==========================================================================================
+ */
+
+"use strict";
+
+// --- КОНСТАНТЫ И НАСТРОЙКИ ---
+const C = {
+    // Физика
+    GRAVITY: 0,
+    FRICTION_ICE: 0.98,       // Уменьшено трение для замедления остановки камня в 1.5 раза
+    FRICTION_SWEEP: 0.999,     // Трение при свипинге (почти нет торможения, продлевает движение)
+    BOUNCE_LOSS: 0.7,          // Потеря скорости при ударе о бортик (0.7 = теряет 30%)
+    COLLISION_DAMPER: 0.95,    // Потеря энергии при столкновении камней
+    STOP_THRESHOLD: 0.05,      // Скорость, ниже которой камень считается остановившимся
+    MAX_POWER: 10,             // Еще уменьшено для баланса замедления
+    WALL_PADDING: 10,          // Отступ бортиков от края холста (визуальный)
+
+    // Размеры и координаты
+    STONE_RADIUS: 19,
+    STONE_MASS: 1,
+    CANVAS_W: 600,
+    CANVAS_H: 850,
+    HOUSE_Y: 160,              // Центр дома по Y
+    ZOOM: 0.75,                // масштаб сцены (1 = без зума)
+    HOUSE_RADII: [130, 90, 50, 15], // Радиусы колец дома (внешнее -> внутреннее)
+    START_LINE_Y: 720,         // Линия старта
+    HOG_LINE_Y: 550,           // Хог-лайн (камень должен пересечь ее)
+    BACK_LINE_Y: 30,           // Бэк-лайн (за домом, камень удаляется)
+
+    // Геймплей
+    STONES_PER_TEAM: 5,        // Камней у каждой команды (по 5 бросков)
+    SWEEP_RADIUS: 55,          // Радиус действия щетки
+    RING_POINTS: [2,4,6,10],   // Очки за попадание в кольца (внешнее->внутреннее)
+    THROW_POWER_MULT: 0.85,    // Множитель силы броска (15% снижение)
+
+    // Цвета
+    COLOR: {
+        RED_MAIN: '#ff1744', RED_DARK: '#b71c1c', RED_LIGHT: '#ff5252',
+        BLUE_MAIN: '#00e5ff', BLUE_DARK: '#0091ea', BLUE_LIGHT: '#81d4fa',
+        ICE: '#e3f2fd', ICE_LINES: '#bbdefb',
+        WALL: '#263238', WALL_GLOW: '#455a64'
+    }
+};
+
+// --- ГЛОБАЛЬНОЕ СОСТОЯНИЕ (STATE) ---
+let S = {
+    // Системные
+    ctx: null,
+    canvas: null,
+    appPhase: 'MENU',          // MENU, PLAYING, ROUND_END, GAME_OVER
+    gameMode: 'bot',           // bot, pvp
+    difficulty: 2,             // 1, 2, 3
+    
+    // Игровой цикл
+    tick: 0,
+    lastTime: 0,
+    
+    // Логика раунда
+    turn: 'RED',               // RED, BLUE
+    round: 1,
+    scoreRed: 0,
+    scoreBlue: 0,
+    stonesThrownRed: 0,
+    stonesThrownBlue: 0,
+    
+    // Бросок (управление)
+    throwPhase: 'AIMING',      // AIMING, POWER, MOVING, BOT_THINKING
+    aimAngle: -Math.PI/2,      // Направление (в радианах)
+    aimDir: 1,                 // Направление качания стрелки
+    power: 0,
+    // Индексы бросков для таблицы
+    throwIndexRed: 0,
+    throwIndexBlue: 0,
+    powerDir: 1,
+    
+    // Объекты
+    stones: [],                // Все камни на поле
+    particles: [],             // Эффекты льда
+    
+    // Мышь / Ввод
+    mouse: { x: 0, y: 0, isDown: false },
+    isSweeping: false,         // Активен ли свипинг в данный момент
+    activeStone: null          // Камень, который сейчас движется
+};
+
+
+/**
+ * ==========================================================================================
+ * КЛАССЫ ОБЪЕКТОВ
+ * ==========================================================================================
+ */
+
+/**
+ * Класс Stone (Камень для керлинга)
+ * Отвечает за свою позицию, физику, отрисовку и состояние.
+ */
+class Stone {
+    constructor(x, y, team, id) {
+        this.id = id;
+        this.x = x;
+        this.y = y;
+        this.team = team;      // 'RED' или 'BLUE'
+        this.vx = 0;           // Скорость по X
+        this.vy = 0;           // Скорость по Y
+        this.r = C.STONE_RADIUS;
+        this.m = C.STONE_MASS;
+        this.isActive = false; // Движется ли?
+        this.inPlay = true;    // Находится ли в пределах правил?
+        this.isRemoved = false;// Удален ли с поля?
+        this.placedTick = S.tick; // Когда был создан
+    }
+
+    // Применить импульс силы
+    launch(angle, power) {
+        this.vx = Math.cos(angle) * power;
+        this.vy = Math.sin(angle) * power;
+        this.isActive = true;
+    }
+
+    // Физический апдейт каждый кадр
+    update(dt) {
+        if (!this.isActive || !this.inPlay || this.isRemoved) return;
+
+        // 1. Применяем трение
+        let friction = C.FRICTION_ICE;
+        
+        // Логика свипинга (теперь просто по курсору, без нажатия)
+        if (S.gameMode === 'pvp' || S.turn === 'RED') {
+            // Проверка: находится ли мышь ПЕРЕД камнем по вектору движения
+            const dxM = S.mouse.x - this.x;
+            const dyM = S.mouse.y - this.y;
+            const distM = Math.sqrt(dxM*dxM + dyM*dyM);
+            
+            // Расстояние от мыши до линии движения
+            // Вектор скорости нормированный
+            const velMag = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+            if (velMag > 0.1) {
+                const nvx = this.vx / velMag;
+                const nvy = this.vy / velMag;
+                // Проекция вектора "камень-мышь" на вектор скорости
+                const projection = dxM * nvx + dyM * nvy;
+
+                // Если мышь близко И находится спереди камня
+                if (distM < C.SWEEP_RADIUS && projection > 0) {
+                    friction = C.FRICTION_SWEEP;
+                    Game.particles.spawn(S.mouse.x, S.mouse.y, this.team, 4); // Увеличено количество частиц для лучшей анимации
+                }
+            }
+        }
+
+        // Применяем трение к скорости
+        this.vx *= friction;
+        this.vy *= friction;
+
+        // 2. Обновляем позицию
+        this.x += this.vx; // В веб-играх dt обычно не используется в упрощенной физике
+        this.y += this.vy;
+
+        // 3. Столкновение с БОРТИКАМИ (Новая фича)
+        // Боковые стенки (с учетом padding)
+        const leftWall = C.WALL_PADDING + this.r;
+        const rightWall = C.CANVAS_W - C.WALL_PADDING - this.r;
+
+        if (this.x < leftWall) {
+            this.x = leftWall;
+            this.vx = -this.vx * C.BOUNCE_LOSS; // Отскок с потерей энергии
+            Game.particles.spawnWall(this.x - this.r, this.y);
+        } else if (this.x > rightWall) {
+            this.x = rightWall;
+            this.vx = -this.vx * C.BOUNCE_LOSS;
+            Game.particles.spawnWall(this.x + this.r, this.y);
+        }
+
+        // 4. Проверка остановки
+        if (Math.abs(this.vx) < C.STOP_THRESHOLD && Math.abs(this.vy) < C.STOP_THRESHOLD) {
+            this.vx = 0;
+            this.vy = 0;
+            this.isActive = false;
+        }
+
+        // 5. Проверка правил (выход за пределы)
+        this.checkBoundaries();
+    }
+
+    checkBoundaries() {
+        // За Бэк-лайн (слишком далеко)
+        if (this.y < C.BACK_LINE_Y - this.r) {
+            this.inPlay = false;
+            this.isActive = false;
+            this.isRemoved = true;
+        }
+        // Раньше удаляли, если камень остановился перед хог-лайном.
+        // Теперь ничего не делаем, чтобы шайбы оставались на льду при недолёте.
+        // (Можно добавить особые эффекты или пометки при необходимости.)
+        
+        // Вылетел за игровую зону по Y (в начало)
+        // (оставлено ниже как было)    
+
+        // Вылетел за игровую зону по Y (в начало)
+        if (this.y > C.CANVAS_H + this.r) {
+            this.inPlay = false; this.isRemoved = true;
+        }
+    }
+
+    // Отрисовка камня
+    draw(ctx) {
+        if (!this.inPlay || this.isRemoved) return;
+
+        const isRed = this.team === 'RED';
+        const mainColor = isRed ? C.COLOR.RED_MAIN : C.COLOR.BLUE_MAIN;
+        const darkColor = isRed ? C.COLOR.RED_DARK : C.COLOR.BLUE_DARK;
+        const lightColor = isRed ? C.COLOR.RED_LIGHT : C.COLOR.BLUE_LIGHT;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // 1. Тень
+        ctx.beginPath();
+        ctx.arc(4, 4, this.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fill();
+
+        // 2. Основной корпус (Гранит)
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r, 0, Math.PI * 2);
+        
+        const grad = ctx.createRadialGradient(-this.r/3, -this.r/3, 0, 0, 0, this.r);
+        grad.addColorStop(0, '#fafafa');
+        grad.addColorStop(0.3, '#cfd8dc'); // Текстура гранита
+        grad.addColorStop(1, '#90a4ae');
+        
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = '#455a64';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 3. Цветное кольцо (ручка)
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r * 0.7, 0, Math.PI * 2);
+        ctx.fillStyle = mainColor;
+        ctx.fill();
+        ctx.strokeStyle = darkColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 4. Блик на ручке
+        ctx.beginPath();
+        ctx.arc(-this.r*0.2, -this.r*0.2, this.r * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fill();
+
+        // 5. Перемычка ручки
+        ctx.beginPath();
+        ctx.rect(-this.r*0.5, -this.r*0.1, this.r, this.r*0.2);
+        ctx.fillStyle = darkColor;
+        ctx.fill();
+
+        // 6. Плюсик на шайбе для визуального эффекта
+        ctx.beginPath();
+        ctx.moveTo(-this.r*0.2, 0);
+        ctx.lineTo(this.r*0.2, 0);
+        ctx.moveTo(0, -this.r*0.2);
+        ctx.lineTo(0, this.r*0.2);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+/**
+ * Класс Particle (Частица)
+ * Эффекты льда при свипинге или ударах.
+ */
+class Particle {
+    constructor(x, y, color, type = 'ice') {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.type = type; // 'ice', 'wall', 'expl'
+        
+        // Разные настройки для разных типов
+        if (type === 'ice') {
+            this.vx = (Math.random() - 0.5) * 1.5;
+            this.vy = (Math.random() - 0.5) * 1.5;
+            this.life = 1.0; // от 1 до 0
+            this.decay = Math.random() * 0.03 + 0.02;
+            this.size = Math.random() * 4 + 2; // Увеличен размер частиц для лучшей анимации
+        } else if (type === 'wall') {
+            this.vx = (Math.random() - 0.5) * 4;
+            this.vy = (Math.random() - 0.5) * 2;
+            this.life = 1.0;
+            this.decay = 0.05;
+            this.size = Math.random() * 2 + 1;
+            this.color = '#fff';
+        } else { // explosion
+            let angle = Math.random() * Math.PI * 2;
+            let speed = Math.random() * 3 + 2;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.life = 1.0;
+            this.decay = 0.04;
+            this.size = Math.random() * 4 + 2;
+        }
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+        if (this.type === 'ice') this.vy += 0.05; // Крошка падает чуть "вниз" экрана
+    }
+
+    draw(ctx) {
+        if (this.life <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+
+/**
+ * ==========================================================================================
+ * ГЛАВНЫЙ МОДУЛЬ ИГРЫ (GAME ENGINE)
+ * ==========================================================================================
+ */
+const Game = {
+
+    // 1. Инициализация
+    init: function() {
+        S.canvas = document.getElementById('gameCanvas');
+        S.ctx = S.canvas.getContext('2d');
+        
+        this.ui.init();
+        this.input.init();
+        
+        // Стартуем цикл
+        requestAnimationFrame(this.loop);
+    }
+};
+
+/**
+ * КИНЕМАТИКА И ФИЗИКА (Раздел > 100 строк)
+ */
+Game.physics = {
+    update: function(dt) {
+        // 1. Обновляем камни
+        let anyMoving = false;
+        let stonesInPlay = S.stones.filter(s => s.inPlay && !s.isRemoved);
+        
+        stonesInPlay.forEach(stone => {
+            stone.update(dt);
+            // если камень перестал двигаться и ещё не оценён – регистрируем очки
+            if (!stone.isActive && !stone.scored && stone.inPlay && !stone.isRemoved) {
+                Game.logic.registerStone(stone);
+                stone.scored = true;
+            }
+            if (stone.isActive) {
+                anyMoving = true;
+                S.activeStone = stone; // Запоминаем движущийся камень
+            }
+        });
+
+        // 2. Обработка столкновений КЛИЕНТ-КЛИЕНТ (N^2)
+        this.checkStoneCollisions(stonesInPlay);
+
+        // 3. Логика смены фаз
+        if (S.throwPhase === 'MOVING' && !anyMoving) {
+            S.activeStone = null;
+            Game.logic.endTurn();
+        }
+    },
+
+    // Математика абсолютно упругого удара для 2D шаров
+    checkStoneCollisions: function(stones) {
+        for (let i = 0; i < stones.length; i++) {
+            for (let j = i + 1; j < stones.length; j++) {
+                let s1 = stones[i];
+                let s2 = stones[j];
+
+                // Быстрая проверка ограничивающих квадратов
+                if (Math.abs(s1.x - s2.x) > s1.r + s2.r) continue;
+                if (Math.abs(s1.y - s2.y) > s1.r + s2.r) continue;
+
+                // Точная проверка дистанции
+                let dx = s2.x - s1.x;
+                let dy = s2.y - s1.y;
+                let distSq = dx*dx + dy*dy;
+                let minDist = s1.r + s2.r;
+
+                if (distSq < minDist*minDist) {
+                    let dist = Math.sqrt(distSq);
+                    // 1. Разделение наложившихся камней (чтобы не застряли)
+                    let overlap = (minDist - dist) / 2;
+                    let nx = dx / dist; // Нормаль
+                    let ny = dy / dist;
+
+                    s1.x -= nx * overlap;
+                    s1.y -= ny * overlap;
+                    s2.x += nx * overlap;
+                    s2.y += ny * overlap;
+
+                    // 2. Математика импульсов
+                    // Скорости вдоль нормали
+                    let v1n = s1.vx * nx + s1.vy * ny;
+                    let v2n = s2.vx * nx + s2.vy * ny;
+
+                    // Учитываем массы (в керлинге равны, но для общего кода)
+                    // Т.к. массы равны, они просто обмениваются скоростями вдоль нормали
+                    let v1nFinal = v2n;
+                    let v2nFinal = v1n;
+
+                    // Потеря энергии при ударе
+                    v1nFinal *= C.COLLISION_DAMPER;
+                    v2nFinal *= C.COLLISION_DAMPER;
+
+                    // Обновляем вектора скоростей
+                    s1.vx += (v1nFinal - v1n) * nx;
+                    s1.vy += (v1nFinal - v1n) * ny;
+                    s2.vx += (v2nFinal - v2n) * nx;
+                    s2.vy += (v2nFinal - v2n) * ny;
+
+                    // Активируем оба камня
+                    s1.isActive = true;
+                    s2.isActive = true;
+
+                    // Эффект удара
+                    let hitColor = s1.placedTick > s2.placedTick ? 
+                        (s1.team === 'RED' ? C.COLOR.RED_LIGHT : C.COLOR.BLUE_LIGHT) :
+                        (s2.team === 'RED' ? C.COLOR.RED_LIGHT : C.COLOR.BLUE_LIGHT);
+                    Game.particles.spawnExplosion((s1.x + s2.x)/2, (s1.y + s2.y)/2, hitColor, 8);
+                }
+            }
+        }
+    }
+};
+
+/**
+ * ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ (БОТ) (Новая сложная логика > 150 строк)
+ */
+Game.ai = {
+    // Бот решает, куда и как кинуть камень
+    think: function() {
+        S.throwPhase = 'BOT_THINKING';
+        
+        // Имитация "размышления"
+        setTimeout(() => {
+            if (S.appPhase !== 'PLAYING' || S.turn !== 'BLUE') return;
+
+            // 1. Анализ ситуации в "Доме"
+            let myStones = [];
+            let opponentStones = [];
+            let centerX = C.CANVAS_W / 2;
+            let centerY = C.HOUSE_Y;
+
+            S.stones.forEach(s => {
+                if (!s.inPlay || s.isRemoved) return;
+                let d = this.getDist(s.x, s.y, centerX, centerY);
+                let info = { stone: s, dist: d };
+                if (s.team === 'BLUE') myStones.push(info);
+                else opponentStones.push(info);
+            });
+
+            // Сортируем по близости к центру
+            opponentStones.sort((a,b) => a.dist - b.dist);
+            myStones.sort((a,b) => a.dist - b.dist);
+
+            let targetX, targetY, powerMult;
+            let isAggressive = false;
+
+            // 2. Выбор стратегии
+            // Если чужой камень ближе к центру, чем все наши, или наших вообще нет в доме
+            if (opponentStones.length > 0 && (myStones.length === 0 || opponentStones[0].dist < myStones[0].dist)) {
+                // Стратегия "ВЫБИВАНИЕ" (Takeout)
+                let bestTarget = opponentStones[0];
+                
+                // Если он очень близко к центру, точно бьем
+                isAggressive = true;
+                targetX = bestTarget.stone.x;
+                targetY = bestTarget.stone.y;
+                // Нужна большая сила, чтобы выбить
+                powerMult = 1.2; 
+            } else {
+                // Стратегия "ПОСТАНОВКА В ЦЕНТР" (Draw)
+                // Целимся в центр дома или чуть перед ним (чтобы сделать гард/защиту)
+                targetX = centerX + (Math.random() - 0.5) * 20; // Небольшой разброс
+                targetY = centerY + (Math.random() - 0.5) * 15;
+                powerMult = 1.0;
+            }
+
+            // 3. Расчет вектора броска
+            let currentStoneX = C.CANVAS_W / 2;
+            let currentStoneY = C.START_LINE_Y;
+
+            // Вектор до цели
+            let dx = targetX - currentStoneX;
+            let dy = targetY - currentStoneY;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            // Базовая физика: сила зависит от корня расстояния (т.к. трение квадратично гасит скорость? Нет, линейно. Force ~ sqrt(dist))
+            // Эмпирическая формула для Draw броска
+            let basePower = Math.sqrt(dist * (1 - C.FRICTION_ICE) * 35); 
+            let finalPower = basePower * powerMult * C.THROW_POWER_MULT;
+
+            // Ограничения
+            if (finalPower > C.MAX_POWER * C.THROW_POWER_MULT) finalPower = C.MAX_POWER * C.THROW_POWER_MULT;
+            if (finalPower < 5 * C.THROW_POWER_MULT) finalPower = 8 * C.THROW_POWER_MULT; // Чтобы хоть как-то доехал
+
+            // Идеальный угол
+            let idealAngle = Math.atan2(dy, dx);
+
+            // 4. Добавление погрешности (зависит от сложности меню, бот умнее на высоких сложностях)
+            let errorMult = 1 / S.difficulty; // Чем выше сложность, тем меньше ошибка
+            let errorAngle = (Math.random() - 0.5) * 0.05 * errorMult; // Малая ошибка угла
+            let errorPower = (Math.random() - 0.5) * 1.0 * errorMult; // Малая ошибка силы
+
+            let finalAngle = idealAngle + errorAngle;
+            finalPower += errorPower;
+
+            // 5. Выполнение броска
+            this.performThrow(finalAngle, finalPower);
+
+        }, 1200 + Math.random() * 800); // Задержка от 1.2 до 2 сек
+    },
+
+    performThrow: function(angle, power) {
+        // Создаем камень бота
+        let id = `s_${S.round}_${S.stonesThrownRed + S.stonesThrownBlue}`;
+        let stone = new Stone(C.CANVAS_W / 2, C.START_LINE_Y, 'BLUE', id);
+        S.stones.push(stone);
+        S.activeStone = stone;
+
+        // Бросок
+        stone.launch(angle, power);
+        S.throwPhase = 'MOVING';
+        S.stonesThrownBlue++;
+        Game.ui.updateHUD();
+
+        // Адекватный бот: умеет свиповать, если видит, что камень не доезжает! (Новая фича)
+        if (power < C.MAX_POWER * 0.8) {
+            this.simulatedSweeping(stone);
+        }
+    },
+
+    // Имитация свипинга ботом
+    simulatedSweeping: function(stone) {
+        let sweepInterval = setInterval(() => {
+            if (!stone.isActive || !stone.inPlay || S.throwPhase !== 'MOVING') {
+                clearInterval(sweepInterval);
+                S.isSweeping = false;
+                return;
+            }
+
+            // Бот "трет" прямо перед камнем
+            let velMag = Math.sqrt(stone.vx*stone.vx + stone.vy*stone.vy);
+            if (velMag > 1) {
+                S.isSweeping = true;
+                // Позиция "мыши" бота
+                S.mouse.x = stone.x + (stone.vx / velMag) * 25 + (Math.random()-0.5)*10;
+                S.mouse.y = stone.y + (stone.vy / velMag) * 25 + (Math.random()-0.5)*10;
+            } else {
+                S.isSweeping = false;
+            }
+
+        }, 50); // каждые 50мс
+    },
+
+    getDist: function(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2 + (y2-y1)**2); }
+};
+
+/**
+ * ИГРОВАЯ ЛОГИКА И ПРАВИЛА (Счет, раунды)
+ */
+Game.logic = {
+    // Начало нового хода
+    startTurn: function() {
+        // Проверка: кончились ли камни?
+        if (S.stonesThrownRed >= C.STONES_PER_TEAM && S.stonesThrownBlue >= C.STONES_PER_TEAM) {
+            this.endRound();
+            return;
+        }
+
+        Game.ui.updateHUD();
+
+        if (S.gameMode === 'bot' && S.turn === 'BLUE') {
+            Game.ai.think();
+        } else {
+            S.throwPhase = 'AIMING';
+            S.aimAngle = -Math.PI / 2; // Строго вверх
+            S.power = 0;
+            // Камень создается игроком при клике (см. Input)
+        }
+    },
+
+    // Завершение хода (когда все камни остановились)
+    endTurn: function() {
+        // Смена команды
+        S.turn = (S.turn === 'RED') ? 'BLUE' : 'RED';
+        // Проверка завершения игры (по броскам)
+        if (S.stonesThrownRed >= C.STONES_PER_TEAM && S.stonesThrownBlue >= C.STONES_PER_TEAM) {
+            this.endGame();
+            return;
+        }
+        this.startTurn();
+    },
+
+    // Регистрирует очки одного камня при его остановке
+    registerStone: function(stone) {
+        // вычисление расстояния до центра дома
+        let cx = C.CANVAS_W / 2;
+        let cy = C.HOUSE_Y;
+        let d = Math.sqrt((stone.x - cx)**2 + (stone.y - cy)**2);
+        let pts = 0;
+        for (let i = 0; i < C.HOUSE_RADII.length; i++) {
+            if (d <= C.HOUSE_RADII[i] + stone.r) {
+                pts = C.RING_POINTS[i];
+                break;
+            }
+        }
+        if (pts === 0) return; // вне колец
+        if (stone.team === 'RED') {
+            S.scoreRed += pts;
+        } else {
+            S.scoreBlue += pts;
+        }
+        Game.ui.updateHUD();
+    },
+
+    endGame: function() {
+        S.appPhase = 'GAME_OVER';
+        let msg;
+        if (S.scoreRed > S.scoreBlue) msg = 'Победили Красные';
+        else if (S.scoreBlue > S.scoreRed) msg = 'Победили Синие';
+        else msg = 'Ничья!';
+        document.getElementById('endTitle').innerText = 'Игра завершена';
+        document.getElementById('endMessage').innerText = msg;
+        document.getElementById('nextRndBtn').innerText = 'Играть ещё';
+        document.getElementById('endScreen').classList.remove('hidden');
+    },
+
+    restartGame: function() {
+        S.scoreRed = 0;
+        S.scoreBlue = 0;
+        S.stonesThrownRed = 0;
+        S.stonesThrownBlue = 0;
+        S.throwIndexRed = 0;
+        S.throwIndexBlue = 0;
+        this.resetField();
+        S.appPhase = 'PLAYING';
+        Game.ui.hideOverlays();
+        this.startTurn();
+    },
+
+    // Конец раунда (энда). Подсчет очков. (> 100 строк логики подсчета)
+    endRound: function() {
+        S.appPhase = 'ROUND_END';
+        
+        let centerX = C.CANVAS_W / 2;
+        let centerY = C.HOUSE_Y;
+        
+        // 1. Фильтруем камни в доме
+        let redInHouse = [];
+        let blueInHouse = [];
+
+        S.stones.forEach(s => {
+            if (!s.inPlay || s.isRemoved) return;
+            let d = Math.sqrt((s.x - centerX)**2 + (s.y - centerY)**2);
+            // Камень считается в доме, если он хотя бы касается внешнего кольца
+            if (d <= C.HOUSE_RADII[0] + s.r) {
+                // вычисляем зону (индекс кольца)
+                let zone = -1;
+                for (let zi = C.HOUSE_RADII.length - 1; zi >= 0; zi--) {
+                    if (d <= C.HOUSE_RADII[zi] + s.r) { zone = zi; break; }
+                }
+                let info = { dist: d, zone };
+                if (s.team === 'RED') redInHouse.push(info);
+                else blueInHouse.push(info);
+            }
+        });
+
+        // 2. Подсчитываем очки по зонам (кольцам)
+        let ptsRed = 0;
+        let ptsBlue = 0;
+        redInHouse.forEach(s => { if (s.zone >= 0) ptsRed += C.RING_POINTS[s.zone]; });
+        blueInHouse.forEach(s => { if (s.zone >= 0) ptsBlue += C.RING_POINTS[s.zone]; });
+
+        // 3. Определяем победителя и очки
+        let winner = null;
+        let msg = "";
+
+        if (ptsRed === 0 && ptsBlue === 0) {
+            msg = "Ничья в раунде! (Пустой дом)";
+        } else if (ptsRed > ptsBlue) {
+            winner = 'RED';
+            S.scoreRed += ptsRed;
+            msg = `Красные получают ${ptsRed} ${this.getNoun(ptsRed, 'очко', 'очка', 'очков')}`;
+        } else if (ptsBlue > ptsRed) {
+            winner = 'BLUE';
+            S.scoreBlue += ptsBlue;
+            msg = `Синие получают ${ptsBlue} ${this.getNoun(ptsBlue, 'очко', 'очка', 'очков')}`;
+        } else {
+            msg = `Ничья в раунде! (${ptsRed}:${ptsBlue})`;
+        }
+
+        // 4. Показываем UI
+        Game.ui.showEndRound(msg);
+        
+        // Тот, кто проиграл раунд, ходит первым в следующем (Правила керлинга: Hammer у победителя)
+        if (winner === 'RED') S.turn = 'BLUE';
+        else if (winner === 'BLUE') S.turn = 'RED';
+        // При ничьей очередность сохраняется
+    },
+
+    nextRound: function() {
+        S.round++;
+        this.resetField();
+        S.appPhase = 'PLAYING';
+        Game.ui.hideOverlays();
+        this.startTurn();
+    },
+
+    // Полный сброс для новой игры или раунда
+    resetField: function() {
+        S.stones = [];
+        S.particles = [];
+        S.stonesThrownRed = 0;
+        S.stonesThrownBlue = 0;
+        S.activeStone = null;
+        S.isSweeping = false;
+        S.aimAngle = -Math.PI / 2;
+        S.power = 0;
+        S.throwIndexRed = 0;
+        S.throwIndexBlue = 0;
+    },
+
+    // Утилита для склонения слов
+    getNoun: function(number, one, two, five) {
+        let n = Math.abs(number); n %= 100; if (n >= 5 && n <= 20) return five;
+        n %= 10; if (n === 1) return one; if (n >= 2 && n <= 4) return two; return five;
+    }
+};
+
+/**
+ * СИСТЕМА ЧАСТИЦ (Эффекты)
+ */
+Game.particles = {
+    spawn: function(x, y, team, count) {
+        const color = team === 'RED' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.7)'; // Ледяная крошка всегда белая
+        for (let i = 0; i < count; i++) {
+            S.particles.push(new Particle(x, y, color, 'ice'));
+        }
+    },
+    spawnWall: function(x, y) {
+        for (let i = 0; i < 5; i++) {
+            S.particles.push(new Particle(x, y, '#fff', 'wall'));
+        }
+    },
+    spawnExplosion: function(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            S.particles.push(new Particle(x, y, color, 'expl'));
+        }
+    },
+    update: function() {
+        for (let i = S.particles.length - 1; i >= 0; i--) {
+            S.particles[i].update();
+            if (S.particles[i].life <= 0) {
+                S.particles.splice(i, 1);
+            }
+        }
+    }
+};
+
+/**
+ * ИНПУТ (УПРАВЛЕНИЕ МЫШЬЮ)
+ */
+Game.input = {
+    init: function() {
+        const canvas = S.canvas;
+        
+        // Обработка движения мыши
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            let rawX = e.clientX - rect.left;
+            let rawY = e.clientY - rect.top;
+            const z = C.ZOOM;
+            const tx = (C.CANVAS_W * (1 - z) / 2) / z;
+            const ty = (C.CANVAS_H * (1 - z) / 2) / z;
+            S.mouse.x = rawX / z - tx;
+            S.mouse.y = rawY / z - ty;
+        });
+
+        // Зажатие кнопки мыши
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Только ЛКМ
+            S.mouse.isDown = true;
+            this.handleClick();
+        });
+
+        // Отпускание кнопки мыши
+        window.addEventListener('mouseup', () => {
+            S.mouse.isDown = false;
+            // Свипинг теперь не зависит от кнопки
+        });
+    },
+
+    handleClick: function() {
+        // Управление доступно только если играем и ход человека
+        if (S.appPhase !== 'PLAYING') return;
+        if (S.gameMode === 'bot' && S.turn === 'BLUE') return;
+
+        if (S.throwPhase === 'AIMING') {
+            // 1 Клик: Фиксируем угол, переходим к силе
+            S.throwPhase = 'POWER';
+            S.power = 0;
+        } else if (S.throwPhase === 'POWER') {
+            // 2 Клик: Фиксируем силу, делаем бросок
+            this.performPlayerThrow();
+        } else if (S.throwPhase === 'MOVING') {
+            // Во время движения клик больше не активирует свипинг (теперь по курсору)
+        }
+    },
+
+    performPlayerThrow: function() {
+        // Создаем камень
+        let id = `s_${S.round}_${S.stonesThrownRed + S.stonesThrownBlue}`;
+        let stone = new Stone(C.CANVAS_W / 2, C.START_LINE_Y, S.turn, id);
+        S.stones.push(stone);
+        S.activeStone = stone;
+
+        // Расчет силы: шкала от 0 до 100, переводим в MAX_POWER
+        let finalPower = (S.power / 100) * C.MAX_POWER * C.THROW_POWER_MULT;
+        if (finalPower < 1) finalPower = 1; // Минимальный тычок
+
+        // Запуск
+        stone.launch(S.aimAngle, finalPower);
+        
+        S.throwPhase = 'MOVING';
+        if (S.turn === 'RED') S.stonesThrownRed++;
+        else S.stonesThrownBlue++;
+        
+        Game.ui.updateHUD();
+    }
+};
+
+/**
+ * UI И РЕНДЕРИНГ (Визуализация > 200 строк)
+ */
+Game.ui = {
+    init: function() {
+        this.setupMenuButtons();
+    },
+
+    // Настройка стильных кнопок меню
+    setupMenuButtons: function() {
+        // Группа Режима
+        const modeBtns = document.querySelectorAll('#modeGroup .option-btn');
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelector('#modeGroup .option-btn.active').classList.remove('active');
+                btn.classList.add('active');
+                S.gameMode = btn.dataset.value;
+            });
+        });
+
+        // Группа Сложности
+        const diffBtns = document.querySelectorAll('#diffGroup .option-btn');
+        diffBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelector('#diffGroup .option-btn.active').classList.remove('active');
+                btn.classList.add('active');
+                S.difficulty = parseInt(btn.dataset.value);
+            });
+        });
+    },
+
+    startInput: function() {
+        document.getElementById('mainMenu').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        
+        S.scoreRed = 0;
+        S.scoreBlue = 0;
+        S.round = 1;
+        S.turn = 'RED'; // Красные всегда начинают первый раунд
+        
+        Game.logic.resetField();
+        S.appPhase = 'PLAYING';
+        Game.logic.startTurn();
+    },
+
+    showMenu: function() {
+        this.hideOverlays();
+        document.getElementById('mainMenu').classList.remove('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        S.appPhase = 'MENU';
+    },
+
+    showEndRound: function(msg) {
+        document.getElementById('endTitle').innerText = `Раунд ${S.round} завершен`;
+        document.getElementById('endMessage').innerText = msg;
+        
+        // Если это был финальный раунд (например, играем до 3), можно менять текст кнопки
+        if (S.round >= 3) {
+             document.getElementById('nextRndBtn').innerText = "Показать итоги";
+             // Тут нужна логика конца игры, но для примера просто след. раунд
+        }
+
+        document.getElementById('endScreen').classList.remove('hidden');
+    },
+
+    hideOverlays: function() {
+        document.getElementById('endScreen').classList.add('hidden');
+        document.getElementById('mainMenu').classList.add('hidden');
+    },
+
+
+    updateHUD: function() {
+        document.getElementById('scoreRed').innerText = S.scoreRed;
+        document.getElementById('scoreBlue').innerText = S.scoreBlue;
+        
+        let turnName = S.turn === 'RED' ? 'Красные' : (S.gameMode === 'bot' ? 'Бот (Синие)' : 'Синие');
+        let textElem = document.getElementById('currentTurnText');
+        textElem.innerText = `Ход: ${turnName}`;
+        textElem.style.color = S.turn === 'RED' ? C.COLOR.RED_LIGHT : C.COLOR.BLUE_LIGHT;
+
+        let totalStones = C.STONES_PER_TEAM * 2;
+        let stonesLeft = totalStones - (S.stonesThrownRed + S.stonesThrownBlue);
+        document.getElementById('stonesLeftText').innerText = `Камней: ${stonesLeft}/${totalStones}`;
+    },
+
+    // --- РЕНДЕРИНГ НА CANVAS ---
+    draw: function(ctx) {
+        // 1. Чистим фон
+        ctx.fillStyle = C.COLOR.ICE;
+        ctx.fillRect(0, 0, C.CANVAS_W, C.CANVAS_H);
+
+        // 2. Применяем зум (намного уменьшенный для расширенного обзора)
+        ctx.save();
+        const zoom = C.ZOOM; // используем константу
+        ctx.scale(zoom, zoom);
+        ctx.translate( (C.CANVAS_W * (1 - zoom) / 2) / zoom, (C.CANVAS_H * (1 - zoom) / 2) / zoom );
+
+        // 3. Рисуем разметку льда
+        this.drawIceMarkings(ctx);
+        
+        // 4. Рисуем БОРТИКИ (Glass effect)
+        this.drawWalls(ctx);
+
+        // 5. Рисуем камни (те, что уже встали, снизу)
+        S.stones.forEach(s => {
+            if (s !== S.activeStone) s.draw(ctx);
+        });
+
+        // 6. Рисуем частицы
+        S.particles.forEach(p => p.draw(ctx));
+
+        // 7. Рисуем активный (движущийся) камень поверх остальных
+        if (S.activeStone) S.activeStone.draw(ctx);
+
+        // 8. Рисуем UI прицеливания (Стрелка и Сила)
+        if (S.appPhase === 'PLAYING') {
+            this.drawThrowUI(ctx);
+        }
+
+        ctx.restore();
+    },
+
+    drawIceMarkings: function(ctx) {
+        ctx.save();
+        ctx.strokeStyle = C.COLOR.ICE_LINES;
+        ctx.lineWidth = 2;
+
+        // Центральная линия
+        ctx.beginPath();
+        ctx.moveTo(C.CANVAS_W/2, 0); ctx.lineTo(C.CANVAS_W/2, C.CANVAS_H);
+        ctx.stroke();
+
+        // Хог-лайн
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(C.WALL_PADDING, C.HOG_LINE_Y); ctx.lineTo(C.CANVAS_W - C.WALL_PADDING, C.HOG_LINE_Y);
+        ctx.stroke();
+        
+        // Бэк-лайн
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(C.WALL_PADDING, C.BACK_LINE_Y); ctx.lineTo(C.CANVAS_W - C.WALL_PADDING, C.BACK_LINE_Y);
+        ctx.stroke();
+
+        // Т-лайн (через центр дома)
+        ctx.beginPath();
+        ctx.moveTo(C.WALL_PADDING, C.HOUSE_Y); ctx.lineTo(C.CANVAS_W - C.WALL_PADDING, C.HOUSE_Y);
+        ctx.stroke();
+
+        // ДОМ (Кольца)
+        let cx = C.CANVAS_W / 2;
+        let cy = C.HOUSE_Y;
+        
+        // Внешнее синее (+2)
+        ctx.beginPath(); ctx.arc(cx, cy, C.HOUSE_RADII[0], 0, Math.PI*2);
+        ctx.fillStyle = C.COLOR.BLUE_MAIN; ctx.fill(); ctx.stroke();
+        
+        // Второй зеленый (+4)
+        ctx.beginPath(); ctx.arc(cx, cy, C.HOUSE_RADII[1], 0, Math.PI*2);
+        ctx.fillStyle = '#4caf50'; ctx.fill(); ctx.stroke();
+
+        // Третий желтый (+6)
+        ctx.beginPath(); ctx.arc(cx, cy, C.HOUSE_RADII[2], 0, Math.PI*2);
+        ctx.fillStyle = '#ffeb3b'; ctx.fill(); ctx.stroke();
+        
+        // Центр красный (+10)
+        ctx.beginPath(); ctx.arc(cx, cy, C.HOUSE_RADII[3], 0, Math.PI*2);
+        ctx.fillStyle = '#f44336'; ctx.fill(); ctx.stroke();
+
+        // Таблички очков в углах (минимализм) с фоновыми прямоугольниками
+        // красные
+        ctx.fillStyle = 'rgba(255,23,68,0.3)';
+        ctx.fillRect(10, 14, 40, 32);
+        ctx.fillStyle = C.COLOR.RED_MAIN;
+        ctx.font = 'bold 24px Poppins';
+        ctx.fillText(`${S.scoreRed}`, 20, 40);
+        // синие (тоже 20px от правого бортика)
+        ctx.fillStyle = 'rgba(0,229,255,0.3)';
+        ctx.fillRect(C.CANVAS_W - 50, 14, 40, 32);
+        ctx.fillStyle = C.COLOR.BLUE_MAIN;
+        ctx.fillText(`${S.scoreBlue}`, C.CANVAS_W - 40, 40);
+
+        ctx.restore();
+    },
+
+    drawWalls: function(ctx) {
+        ctx.save();
+        // Левый бортик
+        ctx.fillStyle = C.COLOR.WALL;
+        ctx.fillRect(0, 0, C.WALL_PADDING, C.CANVAS_H);
+        // Правый
+        ctx.fillRect(C.CANVAS_W - C.WALL_PADDING, 0, C.WALL_PADDING, C.CANVAS_H);
+        
+        // Свечение бортиков (Neon style)
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = C.COLOR.WALL_GLOW;
+        ctx.strokeStyle = C.COLOR.WALL_GLOW;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(C.WALL_PADDING, 0, C.CANVAS_W - C.WALL_PADDING*2, C.CANVAS_H);
+        
+        ctx.restore();
+    },
+
+    drawThrowUI: function(ctx) {
+        let sx = C.CANVAS_W / 2;
+        let sy = C.START_LINE_Y;
+
+        // 1. Стрелка прицеливания (качается)
+        if (S.throwPhase === 'AIMING' || S.throwPhase === 'POWER') {
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(S.aimAngle + Math.PI/2); // Коррекция угла холста
+
+            // Длина стрелки зависит от сложности (ещё увеличена)
+            let arrowLen = 150;
+            
+            // Неоновая линия
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = S.turn === 'RED' ? C.COLOR.RED_MAIN : C.COLOR.BLUE_MAIN;
+            ctx.strokeStyle = S.turn === 'RED' ? C.COLOR.RED_LIGHT : C.COLOR.BLUE_LIGHT;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -arrowLen);
+            
+            // Наконечник
+            ctx.lineTo(-10, -arrowLen + 15);
+            ctx.moveTo(0, -arrowLen);
+            ctx.lineTo(10, -arrowLen + 15);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        // 2. Шкала силы (качается)
+        if (S.throwPhase === 'POWER') {
+            let pWidth = 16; // шире шкала
+            let pHeight = 150; // выше шкала
+            let px = C.CANVAS_W - 50;
+            let py = sy - pHeight / 2;
+
+            // Фон шкалы
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(px, py, pWidth, pHeight);
+            
+            // Текущее значение
+            let fillHeight = (S.power / 100) * pHeight;
+            
+            // Градиент от зеленого к красному
+            let grad = ctx.createLinearGradient(0, py + pHeight, 0, py);
+            grad.addColorStop(0, '#4caf50'); // Green
+            grad.addColorStop(0.5, '#ffeb3b'); // Yellow
+            grad.addColorStop(1, '#f44336'); // Red
+            
+            ctx.fillStyle = grad;
+            // Рисуем снизу вверх
+            ctx.fillRect(px, py + pHeight - fillHeight, pWidth, fillHeight);
+            
+            // Рамка
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(px, py, pWidth, pHeight);
+        }
+
+        // 3. Подсказка для свипинга
+        if (S.throwPhase === 'MOVING' && (S.gameMode === 'pvp' || S.turn === 'RED')) {
+            // Проверяем, близко ли курсор к движущемуся камню
+            let isNear = false;
+            if (S.activeStone) {
+                const dx = S.mouse.x - S.activeStone.x;
+                const dy = S.mouse.y - S.activeStone.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < C.SWEEP_RADIUS) isNear = true;
+            }
+            ctx.save();
+            ctx.beginPath();
+            // радиус учитывает зум, чтобы на экране был половинный
+            const r = (C.SWEEP_RADIUS * 0.5) / C.ZOOM;
+            ctx.arc(S.mouse.x, S.mouse.y, r, 0, Math.PI*2); // Уменьшен радиус и скорректирован по зуму
+            // Пульсирующий круг щетки
+            let teamColor = S.turn === 'RED' ? '255,23,68' : '0,229,255';
+            let alpha = 0.3 + Math.sin(S.tick * 0.1) * 0.2;
+            ctx.fillStyle = isNear ? `rgba(${teamColor}, 0.5)` : `rgba(${teamColor}, ${alpha})`; // Цвет команды
+            ctx.fill();
+            ctx.strokeStyle = `rgba(${teamColor}, 0.7)`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]); // Пунктир
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+};
+
+
+/**
+ * ==========================================================================================
+ * MAIN LOOP (ИГРОВОЙ ЦИКЛ)
+ * ==========================================================================================
+ */
+Game.loop = function(now) {
+    S.tick++;
+    // Расчет дельты времени (dt) для плавной физики
+    if (!S.lastTime) S.lastTime = now;
+    let dt = (now - S.lastTime) / 16.67; // Нормализуем к 60 FPS
+    S.lastTime = now;
+    if (dt > 2) dt = 2; // Ограничитель лагов
+
+    // 1. Апдейт логики качания стрелки/силы (только если ход человека)
+    if (S.appPhase === 'PLAYING') {
+        if (S.throwPhase === 'AIMING') {
+            // СКОРОСТЬ КЛИНКА зависит от сложности (Хард - очень быстро)
+            // Базовая * Коэффициент сложности
+            let baseSpd = 0.02;
+            let diffMult = [0, 0.8, 1.8, 5.0][S.difficulty]; // 1=Медленно, 2=Норма+, 3=ХАРД (увеличено для усложнения)
+            
+            S.aimAngle += baseSpd * diffMult * S.aimDir;
+            
+            // Границы качания (примерно 70 градусов влево/вправо)
+            const limit = Math.PI * 0.38;
+            if (S.aimAngle > -Math.PI/2 + limit) { S.aimAngle = -Math.PI/2 + limit; S.aimDir = -1; }
+            if (S.aimAngle < -Math.PI/2 - limit) { S.aimAngle = -Math.PI/2 - limit; S.aimDir = 1; }
+        } else if (S.throwPhase === 'POWER') {
+            // Скорость шкалы тоже растет
+            let pSpd = [0, 1.5, 2.5, 5.0][S.difficulty];
+            S.power += pSpd * S.powerDir;
+            if (S.power > 100) { S.power = 100; S.powerDir = -1; }
+            if (S.power < 0) { S.power = 0; S.powerDir = 1; }
+        }
+    }
+
+    // 2. Апдейт физики и частиц
+    Game.physics.update(dt);
+    Game.particles.update();
+
+    // 3. Отрисовка
+    Game.ui.draw(S.ctx);
+
+    // Рекурсивный вызов
+    requestAnimationFrame(Game.loop);
+};
+
+
+// ЗАПУСК ПРИ ЗАГРУЗКЕ
+window.onload = function() {
+    Game.init();
+};
+
+</script>
+</body>
+</html>

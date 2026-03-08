@@ -1,0 +1,626 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Classic Pac-Man: Pro Edition</title>
+    <style>
+        :root {
+            --bg: #020205;
+            --wall: #1919A6;
+            --pacman: #ffff00;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- MENU SYSTEM --- */
+        #menu {
+            position: absolute;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.95);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        h1 {
+            font-size: 60px;
+            color: var(--pacman);
+            margin-bottom: 40px;
+            text-shadow: 4px 4px #000, 8px 8px var(--wall);
+            text-transform: uppercase;
+        }
+
+        .settings {
+            background: #111;
+            padding: 25px;
+            border: 4px solid var(--wall);
+            box-shadow: 0 0 15px var(--wall);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 280px;
+        }
+
+        label { font-size: 14px; color: #aaa; font-weight: bold; }
+
+        input[type="color"] {
+            border: 2px solid #fff;
+            width: 35px; height: 35px;
+            cursor: pointer; background: none;
+            padding: 0;
+        }
+
+        .start-btn {
+            background: var(--pacman);
+            color: #000;
+            padding: 15px 50px;
+            font-size: 20px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            box-shadow: 6px 6px 0px #880;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        .start-btn:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px #fff; background: #fff; }
+
+        /* --- GAME UI --- */
+        #game-container { display: none; flex-direction: column; align-items: center; }
+        
+        .hud {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            font-size: 20px;
+            color: var(--pacman);
+            font-weight: bold;
+            text-shadow: 2px 2px #000;
+        }
+
+        canvas {
+            background: #000;
+            border: 5px solid var(--wall);
+            box-shadow: 0 0 20px var(--wall);
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu">
+        <h1>PAC-MAN PRO</h1>
+        <div class="settings">
+            <div class="setting-row"><label>PAC-MAN</label><input type="color" id="cp" value="#ffff00"></div>
+            <div class="setting-row"><label>WALLS</label><span style="color:var(--wall); font-size:12px;">LOCKED</span></div>
+            <div class="setting-row"><label>BLINKY (RED)</label><input type="color" id="cg1" value="#ff0000"></div>
+            <div class="setting-row"><label>PINKY (PINK)</label><input type="color" id="cg2" value="#ffb8ff"></div>
+            <div class="setting-row"><label>INKY (CYAN)</label><input type="color" id="cg3" value="#00ffff"></div>
+            <div class="setting-row"><label>CLYDE (ORANGE)</label><input type="color" id="cg4" value="#ffb851"></div>
+        </div>
+        <button class="start-btn" onclick="launch()">START GAME</button>
+    </div>
+
+    <div id="game-container">
+        <div class="hud">
+            <span>SCORE: <span id="s-score">0</span></span>
+            <span>LEVEL: <span id="s-level">1</span></span>
+            <span>LIVES: <span id="s-lives">3</span></span>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+<script>
+/**
+ * PAC-MAN ENGINE v4.0 (FLAWLESS COLLISION & ADVANCED AI)
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const TILE = 24;
+
+let score = 0, level = 1, lives = 3;
+let map = [], pacman, ghosts = [];
+let powerMode = false, powerTicks = 0;
+let userColors = {};
+
+// --- MAP DATA ---
+// 0: Empty, 1: Wall, 2: Dot, 3: Door, 4: Power, 5: Ghost Spawn, 6: Pacman Spawn
+const MAP_LEVELS = [
+    // LEVEL 1
+    [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+        [1,4,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,4,1],
+        [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+        [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+        [1,1,1,1,2,1,1,1,0,1,0,1,1,1,2,1,1,1,1],
+        [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
+        [1,1,1,1,2,1,0,1,1,3,1,1,0,1,2,1,1,1,1],
+        [0,0,0,0,2,0,0,1,5,5,5,1,0,0,2,0,0,0,0],
+        [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
+        [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
+        [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
+        [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+        [1,4,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,4,1],
+        [1,2,2,1,2,2,2,2,2,6,2,2,2,2,2,1,2,2,1],
+        [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
+        [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ],
+    // LEVEL 2
+    [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,2,2,2,2,2,2,2,1,1,2,2,2,2,2,1,1,2,2,2,2,2,2,2,1],
+        [1,2,1,1,1,1,1,2,1,1,2,1,1,1,2,1,1,2,1,1,1,1,1,2,1],
+        [1,4,1,1,1,1,1,2,2,2,2,2,1,2,2,2,2,2,1,1,1,1,1,4,1],
+        [1,2,2,2,1,1,2,2,1,1,1,2,1,2,1,1,1,2,2,1,1,2,2,2,1],
+        [1,1,1,2,1,1,2,1,1,0,0,0,0,0,0,0,1,1,2,1,1,2,1,1,1],
+        [1,1,1,2,2,2,2,1,0,0,1,1,3,1,1,0,0,1,2,2,2,2,1,1,1],
+        [0,0,0,2,1,1,2,1,0,0,1,5,5,5,1,0,0,1,2,1,1,2,0,0,0],
+        [1,1,1,2,1,1,2,1,0,0,1,1,1,1,1,0,0,1,2,1,1,2,1,1,1],
+        [1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,2,1,1,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,2,1],
+        [1,2,2,2,1,2,2,2,2,2,2,2,6,2,2,2,2,2,2,2,1,2,2,2,1],
+        [1,1,1,2,1,2,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,2,1,1,1],
+        [1,4,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,4,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ],
+    // LEVEL 3
+    [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,2,1,1,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,1,2,1],
+        [1,4,1,1,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,1,4,1],
+        [1,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,1],
+        [1,1,1,2,1,1,2,1,1,1,1,1,0,0,1,1,1,1,1,2,1,1,2,1,1,1],
+        [1,1,1,2,2,2,2,1,1,0,0,0,0,0,0,0,1,1,2,2,2,2,1,1,1],
+        [1,2,2,2,1,1,2,1,1,0,1,1,3,1,1,0,1,1,2,1,1,2,2,2,1],
+        [1,2,1,1,1,1,2,0,0,0,1,5,5,5,1,0,0,0,2,1,1,1,1,2,1],
+        [1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1],
+        [1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1],
+        [1,1,1,1,1,1,2,1,1,1,1,1,0,1,1,1,1,1,2,1,1,1,1,1,1],
+        [1,2,2,2,2,2,2,2,2,2,2,2,6,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
+        [1,2,2,2,1,1,2,2,2,2,1,1,2,1,1,2,2,2,2,1,1,2,2,2,1],
+        [1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1],
+        [1,4,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,4,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ]
+];
+
+// --- UTILITIES ---
+function isWall(x, y) {
+    let col = Math.floor(x / TILE);
+    let row = Math.floor(y / TILE);
+    if (row < 0 || row >= map.length || col < 0 || col >= map[0].length) return false; // Туннели
+    return map[row][col] === 1 || map[row][col] === 3; // 3 = Дверь, сквозь неё нельзя просто так пройти
+}
+
+// Находит координаты нужных тайлов для спавна (5 - призраки, 6 - пакман)
+function findSpawns(type) {
+    let spawns = [];
+    for (let r = 0; r < map.length; r++) {
+        for (let c = 0; c < map[0].length; c++) {
+            if (map[r][c] === type) spawns.push({x: c * TILE, y: r * TILE, col: c, row: r});
+        }
+    }
+    return spawns;
+}
+
+// Выравнивание по сетке для поворотов
+function snapToGrid(val) {
+    return Math.round(val / TILE) * TILE;
+}
+
+// --- ENTITIES ---
+
+class Pacman {
+    constructor() { this.reset(); }
+    
+    reset() {
+        let spawns = findSpawns(6);
+        if (spawns.length > 0) {
+            this.x = spawns[0].x;
+            this.y = spawns[0].y;
+        } else {
+            this.x = TILE; this.y = TILE;
+        }
+        this.dir = { x: 0, y: 0 };
+        this.nextDir = { x: 0, y: 0 };
+        this.speed = 2; // Идеальный делитель для 24
+        this.mouthState = 0;
+        this.mouthDir = 1;
+    }
+
+    update() {
+        // Проверка поворотов на перекрестках (только когда ровно стоим на тайле)
+        if (this.x % TILE === 0 && this.y % TILE === 0) {
+            if (this.nextDir.x !== 0 || this.nextDir.y !== 0) {
+                if (!isWall(this.x + this.nextDir.x * TILE, this.y + this.nextDir.y * TILE)) {
+                    this.dir = { x: this.nextDir.x, y: this.nextDir.y };
+                }
+            }
+            if (isWall(this.x + this.dir.x * TILE, this.y + this.dir.y * TILE)) {
+                this.dir = { x: 0, y: 0 }; // Уперся в стену
+            }
+        }
+
+        this.x += this.dir.x * this.speed;
+        this.y += this.dir.y * this.speed;
+
+        // Туннели (Телепорт слева направо)
+        let maxW = map[0].length * TILE;
+        if (this.x < -TILE/2) this.x = maxW - TILE/2;
+        if (this.x > maxW - TILE/2) this.x = -TILE/2;
+
+        this.eat();
+    }
+
+    eat() {
+        // Считаем центр Пакмана для поедания точек
+        let cx = this.x + TILE/2;
+        let cy = this.y + TILE/2;
+        let col = Math.floor(cx / TILE);
+        let row = Math.floor(cy / TILE);
+
+        if (row >= 0 && row < map.length && col >= 0 && col < map[0].length) {
+            if (map[row][col] === 2) { 
+                map[row][col] = 0; score += 10; checkWin(); 
+            }
+            if (map[row][col] === 4) { 
+                map[row][col] = 0; score += 50; triggerPower(); checkWin(); 
+            }
+        }
+        document.getElementById('s-score').innerText = score;
+    }
+
+    draw() {
+        ctx.fillStyle = userColors.p;
+        
+        // Анимация рта
+        this.mouthState += 0.15 * this.mouthDir;
+        if (this.mouthState >= 0.6 || this.mouthState <= 0) this.mouthDir *= -1;
+
+        let angle = 0;
+        if (this.dir.x === 1) angle = 0;
+        if (this.dir.x === -1) angle = Math.PI;
+        if (this.dir.y === 1) angle = Math.PI/2;
+        if (this.dir.y === -1) angle = -Math.PI/2;
+
+        ctx.save();
+        ctx.translate(this.x + TILE/2, this.y + TILE/2);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE/2 - 2, this.mouthState, Math.PI*2 - this.mouthState);
+        ctx.lineTo(0, 0);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Ghost {
+    constructor(id, color) {
+        this.id = id;
+        this.color = color;
+        this.spawns = findSpawns(5);
+        this.reset();
+    }
+
+    reset() {
+        let spawn = this.spawns[this.id % this.spawns.length];
+        this.x = spawn.x;
+        this.y = spawn.y;
+        this.dir = { x: 0, y: 0 };
+        this.status = 'house'; // house, exiting, hunting
+        this.timer = 40 * (this.id + 1); // Поочередный выход
+        this.speed = 2; // Строго 2, чтобы x % TILE работало
+    }
+
+    update() {
+        if (this.status === 'house') {
+            this.timer--;
+            // Прыгаем вверх-вниз в коробке
+            if (this.timer % 20 === 0) this.y += (this.timer % 40 === 0) ? -2 : 2;
+            if (this.timer <= 0) {
+                this.status = 'exiting';
+                this.y = snapToGrid(this.y); // Фиксим Y перед выходом
+            }
+            return;
+        }
+
+        if (this.status === 'exiting') {
+            // Находим тайл над дверью
+            let doorRow = map.findIndex(r => r.includes(3));
+            let doorCol = map[doorRow].indexOf(3);
+            let tx = doorCol * TILE;
+            let ty = (doorRow - 1) * TILE;
+            
+            // Двигаемся к центру, затем вверх
+            if (this.x !== tx) {
+                this.x += this.x < tx ? this.speed : -this.speed;
+            } else if (this.y !== ty) {
+                this.y -= this.speed;
+            } else {
+                this.status = 'hunting';
+                this.dir = {x: this.id % 2 === 0 ? 1 : -1, y: 0}; // Разбегаются в разные стороны
+            }
+            return;
+        }
+
+        // --- AI LOGIC ---
+        // Принимаем решение ТОЛЬКО ровно на плитке
+        if (this.x % TILE === 0 && this.y % TILE === 0) {
+            this.choosePath();
+        }
+
+        // В режиме страха призраки медленнее (двигаются через кадр)
+        let moveThisFrame = true;
+        if (powerMode && powerTicks % 2 !== 0) moveThisFrame = false;
+
+        if (moveThisFrame) {
+            this.x += this.dir.x * this.speed;
+            this.y += this.dir.y * this.speed;
+        }
+
+        // Туннели
+        let maxW = map[0].length * TILE;
+        if (this.x < -TILE/2) this.x = maxW - TILE/2;
+        if (this.x > maxW - TILE/2) this.x = -TILE/2;
+
+        // Collision Check (хитбокс чуть меньше плитки, чтобы прощало ошибки)
+        let dist = Math.hypot(this.x - pacman.x, this.y - pacman.y);
+        if (dist < TILE * 0.7) {
+            if (powerMode) { 
+                this.reset(); 
+                score += 200; 
+            } else { 
+                die(); 
+            }
+        }
+    }
+
+    choosePath() {
+        const dirs = [{x:1, y:0}, {x:-1, y:0}, {x:0, y:1}, {x:0, y:-1}];
+        
+        // Доступные пути (исключаем стены и разворот на 180 градусов)
+        let valid = dirs.filter(d => {
+            if (d.x === -this.dir.x && d.y === -this.dir.y) return false;
+            return !isWall(this.x + d.x * TILE, this.y + d.y * TILE);
+        });
+
+        // Тупик? Придется развернуться
+        if (valid.length === 0) { 
+            this.dir = {x: -this.dir.x, y: -this.dir.y}; 
+            return; 
+        }
+
+        let targetX = pacman.x;
+        let targetY = pacman.y;
+
+        // Индивидуальное поведение
+        if (powerMode) {
+            // Убегают в углы карты
+            targetX = (this.id % 2 === 0) ? 0 : 10000;
+            targetY = (this.id < 2) ? 0 : 10000;
+        } else {
+            // Blinky (Красный) - преследует напрямую
+            // Pinky (Розовый) - пытается зайти на 4 тайла вперед Пакмана
+            if (this.id === 1) {
+                targetX += pacman.dir.x * TILE * 4;
+                targetY += pacman.dir.y * TILE * 4;
+            }
+            // Inky (Голубой) - патрулирует, если далеко
+            if (this.id === 2 && Math.hypot(this.x - pacman.x, this.y - pacman.y) > TILE * 8) {
+                valid = valid.sort(() => Math.random() - 0.5); // Рандомный выбор
+                this.dir = valid[0];
+                return;
+            }
+            // Clyde (Оранжевый) - уходит в свой угол, если слишком близко
+            if (this.id === 3 && Math.hypot(this.x - pacman.x, this.y - pacman.y) < TILE * 5) {
+                targetX = 0; targetY = 10000;
+            }
+        }
+
+        // Сортируем направления: выбираем то, которое ближе всего по прямой к target
+        valid.sort((a,b) => {
+            let distA = Math.hypot((this.x + a.x*TILE) - targetX, (this.y + a.y*TILE) - targetY);
+            let distB = Math.hypot((this.x + b.x*TILE) - targetX, (this.y + b.y*TILE) - targetY);
+            return distA - distB;
+        });
+
+        this.dir = valid[0];
+    }
+
+    draw() {
+        // Мигание в конце режима powerMode
+        let isScared = powerMode;
+        let c = this.color;
+        if (isScared) {
+            c = (powerTicks < 100 && powerTicks % 20 < 10) ? "#FFFFFF" : "#2222FF";
+        }
+
+        ctx.fillStyle = c;
+        
+        // Тело призрака
+        ctx.beginPath();
+        ctx.arc(this.x + TILE/2, this.y + TILE/2 - 2, TILE/2 - 2, Math.PI, 0);
+        ctx.lineTo(this.x + TILE - 2, this.y + TILE - 2);
+        
+        // Волнистый низ
+        ctx.lineTo(this.x + TILE - 4, this.y + TILE - 6);
+        ctx.lineTo(this.x + TILE/2, this.y + TILE - 2);
+        ctx.lineTo(this.x + 4, this.y + TILE - 6);
+        
+        ctx.lineTo(this.x + 2, this.y + TILE - 2);
+        ctx.fill();
+
+        // Глаза
+        if (!isScared || c === "#FFFFFF") {
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(this.x + TILE/2 - 4, this.y + TILE/2 - 4, 3, 0, 7);
+            ctx.arc(this.x + TILE/2 + 4, this.y + TILE/2 - 4, 3, 0, 7);
+            ctx.fill();
+
+            // Зрачки (смотрят в сторону движения)
+            ctx.fillStyle = "#000";
+            let ox = this.dir.x * 1.5, oy = this.dir.y * 1.5;
+            ctx.beginPath();
+            ctx.arc(this.x + TILE/2 - 4 + ox, this.y + TILE/2 - 4 + oy, 1.5, 0, 7);
+            ctx.arc(this.x + TILE/2 + 4 + ox, this.y + TILE/2 - 4 + oy, 1.5, 0, 7);
+            ctx.fill();
+        } else {
+            // Испуганные глаза
+            ctx.fillStyle = "#FFB8FF";
+            ctx.fillRect(this.x + TILE/2 - 5, this.y + TILE/2 - 4, 3, 3);
+            ctx.fillRect(this.x + TILE/2 + 2, this.y + TILE/2 - 4, 3, 3);
+            // Испуганный рот
+            ctx.strokeStyle = "#FFB8FF";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(this.x + 6, this.y + TILE/2 + 3);
+            ctx.lineTo(this.x + TILE/2, this.y + TILE/2 + 1);
+            ctx.lineTo(this.x + TILE - 6, this.y + TILE/2 + 3);
+            ctx.stroke();
+        }
+    }
+}
+
+// --- ENGINE CORE ---
+
+function launch() {
+    userColors = {
+        p: document.getElementById('cp').value,
+        g1: document.getElementById('cg1').value,
+        g2: document.getElementById('cg2').value,
+        g3: document.getElementById('cg3').value,
+        g4: document.getElementById('cg4').value
+    };
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('game-container').style.display = 'flex';
+    initLevel();
+    gameLoop();
+}
+
+function initLevel() {
+    // Глубокое копирование карты
+    map = MAP_LEVELS[level-1].map(row => [...row]);
+    canvas.width = map[0].length * TILE;
+    canvas.height = map.length * TILE;
+    
+    pacman = new Pacman();
+    ghosts = [
+        new Ghost(0, userColors.g1), new Ghost(1, userColors.g2),
+        new Ghost(2, userColors.g3), new Ghost(3, userColors.g4)
+    ];
+    document.getElementById('s-level').innerText = level;
+}
+
+function triggerPower() {
+    powerMode = true;
+    powerTicks = 400; // Режим страха на время
+}
+
+function die() {
+    lives--;
+    document.getElementById('s-lives').innerText = lives;
+    if (lives <= 0) { 
+        alert("GAME OVER! Твой счет: " + score); 
+        location.reload(); 
+    } else { 
+        pacman.reset(); 
+        ghosts.forEach(g => g.reset()); 
+    }
+}
+
+function checkWin() {
+    let dots = 0;
+    map.forEach(r => r.forEach(t => { if(t===2||t===4) dots++; }));
+    if (dots === 0) {
+        if (level < 3) { 
+            level++; 
+            initLevel(); 
+        } else { 
+            alert("ПОБЕДА! ТЫ РАЗНЕС ЭТУ ИГРУ!"); 
+            location.reload(); 
+        }
+    }
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Отрисовка карты
+    map.forEach((row, r) => row.forEach((tile, c) => {
+        let x = c * TILE, y = r * TILE;
+        if (tile === 1) { // Стена
+            ctx.fillStyle = "#1919A6";
+            ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+            ctx.strokeStyle = "#000044";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, TILE, TILE);
+        } else if (tile === 2) { // Маленькая точка
+            ctx.fillStyle = "#FFB8AE";
+            ctx.beginPath(); 
+            ctx.arc(x + TILE/2, y + TILE/2, 2.5, 0, Math.PI*2); 
+            ctx.fill();
+        } else if (tile === 4) { // Энергетик
+            ctx.fillStyle = "#FFB8AE";
+            ctx.beginPath(); 
+            ctx.arc(x + TILE/2, y + TILE/2, 6 + Math.sin(Date.now()/150)*1.5, 0, Math.PI*2); 
+            ctx.fill();
+        } else if (tile === 3) { // Дверь спавна
+            ctx.fillStyle = "#FFB8FF";
+            ctx.fillRect(x, y + TILE/2 - 2, TILE, 4);
+        }
+    }));
+
+    pacman.update();
+    pacman.draw();
+    
+    ghosts.forEach(g => { g.update(); g.draw(); });
+
+    if (powerMode) {
+        powerTicks--;
+        if (powerTicks <= 0) powerMode = false;
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Управление (WASD + Стрелочки, работает даже при русской раскладке)
+window.addEventListener('keydown', e => {
+    let k = e.key.toLowerCase();
+    if (k === 'w' || k === 'ц' || k === 'arrowup') pacman.nextDir = {x: 0, y: -1};
+    if (k === 's' || k === 'ы' || k === 'arrowdown') pacman.nextDir = {x: 0, y: 1};
+    if (k === 'a' || k === 'ф' || k === 'arrowleft') pacman.nextDir = {x: -1, y: 0};
+    if (k === 'd' || k === 'в' || k === 'arrowright') pacman.nextDir = {x: 1, y: 0};
+});
+</script>
+</body>
+</html>

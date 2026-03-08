@@ -1,0 +1,1101 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Master Royale — Full</title>
+<style>
+  :root{
+    --ui-bg: rgba(6,8,12,0.86);
+    --accent: #00c853;
+    --accent-2: #00bfa5;
+    --muted: #9fb3b8;
+    --panel: rgba(255,255,255,0.03);
+    --glass: rgba(255,255,255,0.02);
+    --blue: #007bff;
+    --danger: #ff5252;
+    --gold: #ffd700;
+    --green: #20b24a;
+  }
+  html,body{height:100%;margin:0;background:#05070a;font-family:Inter,ui-sans-serif,system-ui,Arial,Helvetica,sans-serif;color:#fff;overflow:hidden}
+  #container{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  canvas{
+    background:linear-gradient(#0f1113,#151718);
+    border-radius:12px;
+    box-shadow:0 24px 60px rgba(0,0,0,0.7);
+    border:3px solid rgba(255,255,255,0.03);
+  }
+
+  /* header (no large central square) */
+  #headerBar{position:fixed;left:50%;transform:translateX(-50%);top:10px;display:flex;align-items:center;gap:12px;z-index:300}
+  .logoSmall{width:46px;height:46px;border-radius:10px;background:linear-gradient(90deg,#00c853,#00bfa5);display:flex;align-items:center;justify-content:center;font-weight:900;color:#001;font-size:18px;box-shadow:0 6px 18px rgba(0,200,83,0.12)}
+  .titleMainSmall{font-size:18px;font-weight:800;color:#fff}
+  .headerActions{display:flex;gap:8px;align-items:center;margin-left:12px}
+  .tabBtn{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:#0c0d0f;cursor:pointer;color:#ddd;transition:transform .12s,background .18s,box-shadow .18s}
+  .tabBtn:hover{transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.45)}
+  .tabBtn.active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001;border-color:transparent; font-weight:800}
+
+  /* panels */
+  #menuPanels{position:fixed;left:50%;transform:translateX(-50%);top:72px;width:88%;max-width:980px;display:grid;grid-template-columns:1fr 320px;gap:12px;z-index:220}
+  #leftPanel{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:14px;border-radius:12px;box-shadow:0 14px 30px rgba(0,0,0,0.6)}
+  #rightPanel{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:12px;border-radius:12px;box-shadow:0 14px 30px rgba(0,0,0,0.6)}
+  .small{font-size:13px;color:var(--muted)}
+  .deckGrid{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-start;padding:8px}
+  .cardPick{width:104px;height:100px;border-radius:12px;background:linear-gradient(180deg,#121214,#0b0b0c);display:flex;align-items:center;justify-content:center;font-size:34px;cursor:pointer;border:2px solid rgba(255,255,255,0.04);position:relative;transition:transform .12s,box-shadow .12s}
+  .cardPick:hover{transform:translateY(-6px); box-shadow:0 18px 30px rgba(0,0,0,0.6)}
+  .cardPick.selected{box-shadow:0 0 0 6px rgba(0,200,83,0.10);border-color:var(--accent)}
+  .cardPick .lbl{position:absolute;bottom:8px;font-size:12px;color:#ddd;white-space:nowrap}
+  .skinChooser{position:absolute;left:8px;top:6px;background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(255,255,255,0.02));padding:6px;border-radius:8px;display:none;flex-direction:column;gap:6px;z-index:300}
+  .skinBtn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;background:rgba(255,255,255,0.03);color:#fff;transition:transform .12s,background .12s}
+  .skinBtn:hover{transform:translateY(-2px);background:rgba(255,255,255,0.06)}
+  .skinBtn.selected{box-shadow:0 8px 20px rgba(0,0,0,0.6);transform:translateY(-2px)}
+
+  #guideList{max-height:360px;overflow:auto}
+  .guideRow{padding:8px;border-radius:8px;transition:background .12s;display:flex;align-items:center;justify-content:space-between}
+  .guideRow:hover{background:rgba(255,255,255,0.02);cursor:pointer}
+
+  #cardDetail{position:relative;overflow:hidden;height:100%}
+  #cardDetailInner{position:absolute;right:-360px;top:0;width:360px;max-width:100%;height:100%;background:linear-gradient(180deg,#071018,#06080b);border-radius:10px;padding:12px;box-shadow: -10px 12px 40px rgba(0,0,0,0.6);transition:right .32s cubic-bezier(.2,.9,.2,1)}
+  #cardDetailInner.open{right:0}
+  .statTable{margin-top:6px;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .statTable div{color:var(--muted)}
+
+  /* HUD and bottom UI */
+  #ui{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;display:flex;gap:12px;background:var(--ui-bg);padding:12px;border-radius:16px;z-index:40;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+  .unitBtn{position:relative;font-size:20px;padding:8px 10px;border-radius:10px;border:2px solid rgba(255,255,255,0.04);background:#0b0b0b;color:#fff;cursor:pointer;min-width:72px;transition:transform .12s;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .unitBtn .cost{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:11px;color:#ffd66b;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:8px}
+  .unitBtn .nameLbl{font-size:11px;color:#ddd;white-space:nowrap}
+  .unitBtn:hover{transform:translateY(-4px)}
+  .unitBtn.active{background:var(--blue);border-color:#00aaff}
+  .unitBtn.disabled{opacity:0.28;pointer-events:none}
+
+  #elixirBarWrap{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:45}
+  #elixirBar{width:360px;height:18px;background:rgba(255,255,255,0.04);border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+  #elixirFill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .2s}
+
+  /* HUD top */
+  #hudTop{position:fixed;left:50%;transform:translateX(-50%);top:12px;display:flex;gap:14px;align-items:center;z-index:40; color:#ddd}
+  .timer{background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:8px}
+  .towerStat{font-size:13px;color:#ddd}
+
+  /* mini-game */
+  #miniGameWrap{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:500;background:#071018;border-radius:12px;padding:12px;box-shadow:0 12px 40px rgba(0,0,0,0.7)}
+  #miniCanvas{background:#05060a;border-radius:8px;display:block}
+
+  /* small responsive */
+  @media (max-width:980px){
+    #menuPanels{grid-template-columns:1fr;left:50%;transform:translateX(-50%);width:94%}
+    #cardDetailInner{width:100%;right:-100%}
+    #cardDetailInner.open{right:0}
+  }
+</style>
+</head>
+<body>
+  <!-- LOADING -->
+  <div id="loadingScreen" style="z-index:900">
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="logoSmall">MR</div>
+      <div style="text-align:left">
+        <div class="titleMainSmall">Master Royale</div>
+        <div class="small">Decks, Battles & Creativity</div>
+      </div>
+    </div>
+    <div id="loadingDots">• • •</div>
+    <div class="small" style="margin-top:10px;opacity:0.85">Подготовка…</div>
+  </div>
+
+  <!-- HEADER -->
+  <div id="headerBar">
+    <div class="logoSmall">MR</div>
+    <div style="display:flex;flex-direction:column;justify-content:center">
+      <div class="titleMainSmall">Master Royale</div>
+      <div class="small" style="margin-top:2px">Decks, Battles & Creativity</div>
+    </div>
+    <div class="headerActions" style="margin-left:18px">
+      <button class="tabBtn active" data-tab="game">Играть</button>
+      <button class="tabBtn" data-tab="deck">Колода</button>
+      <button class="tabBtn" data-tab="guide">Справочник</button>
+      <button class="tabBtn" data-tab="changes">Обновления</button>
+      <button class="tabBtn" data-tab="minigames">Мини-игры</button>
+    </div>
+  </div>
+
+  <!-- Panels -->
+  <div id="menuPanels">
+    <div id="leftPanel">
+      <div id="tabGame" class="tabContent">
+        <div style="display:flex;gap:12px;align-items:center;flex-direction:column">
+          <div class="small">Нажми <strong>Играть</strong>, чтобы начать матч. В бою доступны только выбранные карты.</div>
+          <div style="display:flex;gap:10px;margin-top:10px">
+            <button id="playBtn" class="tabBtn" style="background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001;border:none;padding:10px 16px">Играть</button>
+            <button id="quickPlay" class="tabBtn" style="padding:10px 16px">Мини-игра</button>
+            <button id="openGuide" class="tabBtn" style="padding:10px 16px">Открыть справочник</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabDeck" class="tabContent" style="display:none; margin-top:8px">
+        <div class="small">Выбери до <strong>5</strong> карт для своей колоды.</div>
+        <div class="deckGrid" id="deckGrid"></div>
+        <div class="note" style="margin-top:8px">Выбрано: <span id="deckCount">0</span>/5</div>
+      </div>
+
+      <div id="tabGuide" class="tabContent" style="display:none; margin-top:8px">
+        <div class="small" style="margin-bottom:8px; font-weight:700">Справочник карт — нажми на карту справа для детальной таблицы</div>
+        <div id="guideList"></div>
+      </div>
+
+      <div id="tabChanges" class="tabContent" style="display:none; margin-top:8px">
+        <div class="small" style="margin-bottom:8px; font-weight:700">Список обновлений</div>
+        <div id="changesList" style="font-size:13px;line-height:1.4">
+          <div style="font-weight:700;margin-bottom:6px">Версия 1.5.0 — Mini & UX</div>
+          <div class="small">Прыжки Санжара усложнены, добавлено движение влево/вправо. Шкала эликсира возвращена. Скины показывают уведомление о выборе.</div>
+        </div>
+      </div>
+
+      <div id="tabMinigames" class="tabContent" style="display:none; margin-top:8px">
+        <div class="small" style="margin-bottom:8px; font-weight:700">Мини-игры</div>
+        <div style="display:flex;gap:8px;flex-direction:column">
+          <button id="startSnake" class="tabBtn" style="padding:10px 12px">Змейка</button>
+          <button id="startSanjar" class="tabBtn" style="padding:10px 12px">Прыжки Санжара</button>
+          <div class="small" style="opacity:.9">Мини-игры бесплатны и запускаются без наград — просто для фана.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="rightPanel">
+      <div style="font-weight:700;margin-bottom:8px">Справочник — детали карты</div>
+      <div id="cardDetail">
+        <div id="cardDetailInner" aria-hidden="true">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;gap:10px;align-items:center">
+              <div id="detailEmoji" style="font-size:26px">✨</div>
+              <div>
+                <div id="detailName" style="font-weight:800">Название</div>
+                <div id="detailDesc" class="small">Описание</div>
+              </div>
+            </div>
+            <button id="closeDetail" class="tabBtn" style="padding:6px 8px">Закрыть</button>
+          </div>
+          <div id="detailStats" class="statTable" style="display:grid">
+            <div>Скорость</div><div id="statSpeed" style="text-align:right">-</div>
+            <div>Урон</div><div id="statDmg" style="text-align:right">-</div>
+            <div>HP</div><div id="statHp" style="text-align:right">-</div>
+            <div>Цена</div><div id="statCost" style="text-align:right">-</div>
+            <div>Особенности</div><div id="statFlags" style="text-align:right">-</div>
+          </div>
+          <div style="margin-top:10px">
+            <div style="font-weight:700;margin-bottom:6px">История изменений</div>
+            <div id="detailChanges" class="small" style="max-height:160px;overflow:auto">Нет данных.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-weight:700;margin-bottom:6px">Подсказки</div>
+        <div class="small">При выборе скина появится уведомление "Скин выбран". В меню больше нет большого квадрата.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- main canvas -->
+  <div id="container">
+    <canvas id="gameCanvas" width="980" height="560"></canvas>
+  </div>
+
+  <!-- HUD -->
+  <div id="hudTop" style="display:none">
+    <div class="towerStat">Башня (Вы): <span id="playerHp">320</span></div>
+    <div class="timer">02:00</div>
+    <div class="towerStat">Башня (Враг): <span id="enemyHp">320</span></div>
+  </div>
+
+  <!-- elixir bar -->
+  <div id="elixirBarWrap" style="display:none">
+    <div id="elixirBar"><div id="elixirFill"></div></div>
+  </div>
+
+  <div id="ui" aria-hidden="false" style="display:none">
+    <div id="abilityPanel"></div>
+  </div>
+
+  <div id="msg"></div>
+
+  <div id="miniGameWrap">
+    <canvas id="miniCanvas" width="480" height="360"></canvas>
+    <div style="display:flex;gap:8px;margin-top:8px;justify-content:center">
+      <button id="closeMini" class="tabBtn" style="padding:6px 12px;background:#d32f2f">Закрыть</button>
+    </div>
+  </div>
+
+  <button id="restartBtn" style="display:none; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); padding:12px 18px; border-radius:10px; border:none; background:var(--accent); color:#001; font-weight:700; z-index:50">🔁 Перезапуск</button>
+
+<script>
+/* ================= Final Master Royale — requested changes implemented
+   - Removed central big square in menu (panel removed)
+   - Sanjar Jump (mini-game) made much harder, added left/right movement, pickups, moving platforms, speed increases, record saving
+   - Snake fully working with restart
+   - Skin selection shows "Скин выбран" notification
+   - Elixir bar returned and fills during game
+   - Card detail slides in on click in guide
+   - Preserved all previous mechanics and colors except requested changes
+=============================================================================*/
+
+/* ---------- DOM & canvas ---------- */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W = canvas.width, H = canvas.height;
+
+/* Panels */
+const tabBtns = document.querySelectorAll('.tabBtn');
+const playBtn = document.getElementById('playBtn');
+const quickPlay = document.getElementById('quickPlay');
+const openGuide = document.getElementById('openGuide');
+const deckGrid = document.getElementById('deckGrid');
+const deckCountEl = document.getElementById('deckCount');
+const guideList = document.getElementById('guideList');
+const cardDetailInner = document.getElementById('cardDetailInner');
+const detailEmoji = document.getElementById('detailEmoji');
+const detailName = document.getElementById('detailName');
+const detailDesc = document.getElementById('detailDesc');
+const statSpeed = document.getElementById('statSpeed');
+const statDmg = document.getElementById('statDmg');
+const statHp = document.getElementById('statHp');
+const statCost = document.getElementById('statCost');
+const statFlags = document.getElementById('statFlags');
+const detailChanges = document.getElementById('detailChanges');
+const closeDetail = document.getElementById('closeDetail');
+
+const elixirBarWrap = document.getElementById('elixirBarWrap');
+const elixirFill = document.getElementById('elixirFill');
+
+const miniWrap = document.getElementById('miniGameWrap');
+const miniCanvas = document.getElementById('miniCanvas');
+const closeMini = document.getElementById('closeMini');
+const startSnakeBtn = document.getElementById('startSnake');
+const startSanjarBtn = document.getElementById('startSanjar');
+const msgBox = document.getElementById('msg');
+const hudTop = document.getElementById('hudTop');
+const restartBtn = document.getElementById('restartBtn');
+const playerHpEl = document.getElementById('playerHp');
+const enemyHpEl = document.getElementById('enemyHp');
+
+/* ---------- state ---------- */
+let gameRunning = false;
+let selectedType = null, selectedCost = 0;
+let selectedDeck = [];
+let selectedSkins = {}; // e.g. { arystan: 'invulnerable', sanjar: 'green' }
+let player = { tower: { x:44, y:H/2-64, w:52, h:128, hp:320, maxHp:320 }, elixir:0, maxElixir:10, deck: [] };
+let enemy  = { tower: { x:W-96, y:H/2-64, w:52, h:128, hp:320, maxHp:320 }, elixir:0, maxElixir:10, lastPlay:0, playInterval:1100 };
+let units = [], projectiles = [], effects = [], enemyDeck = [];
+let lastTime = performance.now(), matchStartTime = 0, matchDuration = 120000;
+let cameraShake = {x:0,y:0,intensity:0};
+let sanjarShMode = false, sanjarShCooldown = 0, sanjarShCooldownMs = 5000;
+
+/* ---------- cards ---------- */
+const ALL_CARDS = [
+  {id:'adel', emoji:'⚔️', name:'Knight', cost:3, desc:'Сбалансированный боец'},
+  {id:'daniyar', emoji:'🔥', name:'Zhirobas', cost:10, desc:'Мощный танк, идёт прямо на башню'},
+  {id:'mage',  emoji:'🪄', name:'Wizard', cost:4, desc:'Дальний стрелок'},
+  {id:'altair', emoji:'💀', name:'Sceleton', cost:3, desc:'Быстрый мелкий — спавн по двое (низкий HP)'},
+  {id:'arystan', emoji:'🚧', name:'Invincible', cost:5, desc:'Бежит прямо к башне, неуязвим в беге, затем становится уязвим и наносит урон у башни (30 дмг)'},
+  {id:'sanjar', emoji:'🛩️', name:'Plane', cost:6, desc:'Летает и наносит сплеш (агрит башню)'},
+  {id:'klim', emoji:'🏹', name:'Strela', cost:5, desc:'Стреляет по башне очень часто'},
+  {id:'sanjar_sh', emoji:'🔮', name:'Shrink', cost:8, desc:'Уменьшает или увеличивает союзного юнита (активируется отдельно)'},
+  {id:'kaysar', emoji:'🌙', name:'Vedma', cost:7, desc:'Призывает светлячков (каждые 2s — по 3)'},
+  {id:'firefly', emoji:'✨', name:'lil bro', cost:0, desc:'Призванный юнит — слабый, атакует всё'}
+];
+
+/* ---------- template ---------- */
+function tpl(id){
+  switch(id){
+    case 'adel': return {emoji:'⚔️', size:15, maxHp:42, damage:7, range:48, speed:160, shoots:false, cost:3, flying:false};
+    case 'daniyar': return {emoji:'🔥', size:34, maxHp:280, damage:36, range:26, speed:50, shoots:false, cost:10, flying:false, onlyTower:true};
+    case 'mage': return {emoji:'🪄', size:12, maxHp:40, damage:16, range:110, speed:90, shoots:true, projectile:true, cost:4, flying:false};
+    case 'altair': return {emoji:'💀', size:9, maxHp:18, damage:1.0, range:38, speed:220, shoots:false, cost:3, flying:false}; // lighter HP & dmg
+    case 'arystan': return {emoji:'🚧', size:12, maxHp:110, damage:0, range:18, speed:420, shoots:false, cost:5, flying:false, arystan:true, arystanTotalDamage:30, arystanDestroySeconds:2};
+    case 'sanjar': return {emoji:'🛩️', size:14, maxHp:110, damage:14, range:95, speed:120, shoots:false, cost:6, flying:true, splashRadius:48};
+    case 'klim': return {emoji:'🏹', size:11, maxHp:38, damage:1, range:20, speed:0, shoots:true, projectile:true, cost:5, flying:false, klimShot:true, klimTowerDmg:1, klimCooldown:100};
+    case 'sanjar_sh': return {emoji:'🔮', size:18, maxHp:160, damage:8, range:110, speed:80, shoots:true, projectile:false, cost:8, flying:false};
+    case 'kaysar': return {emoji:'🌙', size:16, maxHp:80, damage:10, range:32, speed:85, shoots:false, cost:7, flying:false, spawnInterval:2000, spawnCount:3};
+    case 'firefly': return {emoji:'✨', size:6, maxHp:8, damage:2, range:20, speed:160, shoots:false, cost:0, flying:false};
+    default: return {emoji:'?', size:12, maxHp:30, damage:6, range:40, speed:90, shoots:false, cost:3, flying:false};
+  }
+}
+
+/* ---------- helpers ---------- */
+function isAltairId(id){ return id === 'altair'; }
+function isArystanId(id){ return id === 'arystan'; }
+
+/* ---------- UI: deck grid & skins & guide (with click -> detail slide) ---------- */
+function refreshDeckGrid(){
+  deckGrid.innerHTML = '';
+  ALL_CARDS.forEach(card=>{
+    if(card.id==='firefly') return;
+    const d = document.createElement('div');
+    d.className = 'cardPick' + (selectedDeck.includes(card.id)?' selected':'');
+    d.innerHTML = `<div style="font-size:34px">${card.emoji}</div><div class="lbl">${card.name} (${card.cost})</div>`;
+    // skin chooser for arystan and sanjar
+    if(card.id === 'arystan' || card.id === 'sanjar'){
+      const chooser = document.createElement('div'); chooser.className='skinChooser';
+      const btnDefault = document.createElement('button'); btnDefault.className='skinBtn'; btnDefault.textContent = 'Обычный';
+      const btnAlt = document.createElement('button'); btnAlt.className='skinBtn';
+      if(card.id === 'arystan'){ btnAlt.textContent = 'Неуязвимый'; }
+      if(card.id === 'sanjar'){ btnAlt.textContent = 'Бомбардиро'; }
+      function applySkinChoice(skin){
+        selectedSkins[card.id] = skin;
+        Array.from(chooser.querySelectorAll('.skinBtn')).forEach(b=>b.classList.remove('selected'));
+        const chosenBtn = skin === 'default' ? btnDefault : btnAlt;
+        chosenBtn.classList.add('selected');
+        if(skin === 'invulnerable') d.style.boxShadow = '0 8px 36px rgba(255,215,0,0.06)';
+        else if(skin === 'green') d.style.boxShadow = '0 8px 36px rgba(32,178,74,0.06)';
+        else d.style.boxShadow = '';
+        // notify user
+        flashMsg(`Скин выбран: ${card.name} — ${chosenBtn.textContent}`);
+        buildBottomUI();
+      }
+      btnDefault.addEventListener('click', (e)=>{ e.stopPropagation(); applySkinChoice('default'); });
+      btnAlt.addEventListener('click', (e)=>{ e.stopPropagation(); applySkinChoice(card.id==='arystan' ? 'invulnerable' : 'green'); });
+      chooser.appendChild(btnDefault); chooser.appendChild(btnAlt);
+      d.appendChild(chooser);
+      d.addEventListener('mouseenter', ()=>{ chooser.style.display='flex'; });
+      d.addEventListener('mouseleave', ()=>{ chooser.style.display='none'; });
+    }
+    d.onclick = ()=>{
+      if(selectedDeck.includes(card.id)) selectedDeck = selectedDeck.filter(x=>x!==card.id);
+      else {
+        if(selectedDeck.length < 5) selectedDeck.push(card.id);
+        else { selectedDeck.shift(); selectedDeck.push(card.id); }
+      }
+      deckCountEl.textContent = selectedDeck.length;
+      refreshDeckGrid();
+    };
+    deckGrid.appendChild(d);
+  });
+  deckCountEl.textContent = selectedDeck.length;
+}
+refreshDeckGrid();
+
+/* guide build with clickable rows that open right detail panel */
+function buildGuide(){
+  guideList.innerHTML = '';
+  ALL_CARDS.forEach(c=>{
+    if(c.id==='firefly') return;
+    const row = document.createElement('div');
+    row.className = 'guideRow';
+    row.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><div style="font-size:20px">${c.emoji}</div><div><div style="font-weight:700">${c.name}</div><div class="small">${c.desc}</div></div></div><div style="color:var(--muted);">${c.cost}⚡</div>`;
+    row.addEventListener('click', ()=> openCardDetail(c.id));
+    guideList.appendChild(row);
+  });
+}
+buildGuide();
+
+/* open and populate card detail panel (slides in) */
+function openCardDetail(id){
+  const c = ALL_CARDS.find(x=>x.id===id);
+  if(!c) return;
+  const s = tpl(id);
+  detailEmoji.textContent = c.emoji;
+  detailName.textContent = c.name;
+  detailDesc.textContent = c.desc;
+  statSpeed.textContent = typeof s.speed === 'number' ? Math.round(s.speed) : '-';
+  statDmg.textContent = s.damage !== undefined ? s.damage : '-';
+  statHp.textContent = s.maxHp !== undefined ? s.maxHp : '-';
+  statCost.textContent = s.cost !== undefined ? s.cost + ' ⚡' : '-';
+  let flags = [];
+  if(s.flying) flags.push('Летает');
+  if(s.onlyTower) flags.push('Идёт на башню');
+  if(s.spawnCount) flags.push(`Призывает ${s.spawnCount}`);
+  if(s.klimShot) flags.push('Стрелок по башне');
+  statFlags.textContent = flags.length ? flags.join(', ') : '—';
+  const hist = [];
+  if(id === 'arystan') hist.push('Arystan: наносит 30 урона за ~2 секунды; неуязвим в беге.');
+  if(id === 'altair') hist.push('Альтаир: спавн 2 юнита за 3 эликсира; снижены HP и урон.');
+  if(id === 'kaysar') hist.push('Кайсар: призывает 3 светлячка каждые 2s.');
+  if(hist.length === 0) hist.push('Последних изменений нет.');
+  detailChanges.innerHTML = hist.map(h=>`<div style="margin-bottom:6px">${h}</div>`).join('');
+  cardDetailInner.classList.add('open');
+  cardDetailInner.setAttribute('aria-hidden','false');
+}
+closeDetail.addEventListener('click', ()=>{ cardDetailInner.classList.remove('open'); cardDetailInner.setAttribute('aria-hidden','true'); });
+
+/* ---------- tabs switching ---------- */
+tabBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    tabBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const t = btn.dataset.tab;
+    document.getElementById('tabGame').style.display = t==='game'?'block':'none';
+    document.getElementById('tabDeck').style.display = t==='deck'?'block':'none';
+    document.getElementById('tabGuide').style.display = t==='guide'?'block':'none';
+    document.getElementById('tabChanges').style.display = t==='changes'?'block':'none';
+    document.getElementById('tabMinigames').style.display = t==='minigames'?'block':'none';
+  });
+});
+
+/* ---------- Unit & Projectile classes (mechanics kept) ---------- */
+class Unit {
+  constructor(x,y,team,id,spawnedSkin){
+    this.x=x; this.y=y; this.team=team; this.id=id;
+    const t = tpl(id);
+    this.emoji=t.emoji; this.size=t.size; this.maxHp=t.maxHp; this.hp=this.maxHp;
+    this.damage=t.damage; this.range=t.range; this.speed=t.speed; this.shoots=!!t.shoots; this.projectile=!!t.projectile;
+    this.onlyTower=!!t.onlyTower; this.flying=!!t.flying; this.explodeDamage=t.explodeDamage||0;
+    this.splashRadius=t.splashRadius||0; this.klimShot=!!t.klimShot; this.klimTowerDmg=t.klimTowerDmg||0;
+    this.klimCooldown=t.klimCooldown||0; this.lastShot=0; this.target=null; this.spawn=performance.now();
+    this.sizeScale = 1; this._selectedForSanjarSh=false;
+    this.invulnerable = false;
+    this.skin = spawnedSkin || (this.team==='player' ? (selectedSkins[id] || 'default') : 'default');
+    if(this.id==='arystan'){
+      const tA = tpl('arystan');
+      this.maxHp = tA.maxHp || 110; this.hp = this.maxHp;
+      this.arystan = { running:true, totalDamage: tA.arystanTotalDamage || 30, destroySeconds: tA.arystanDestroySeconds || 2, startedAt:null, lastTick:null, ratePerMs: null };
+      this.invulnerable = true;
+      this._zigphase = Math.random()*Math.PI*2;
+    }
+    if(id==='kaysar'){ this.lastSpawn = performance.now(); this.spawnInterval = t.spawnInterval || 2000; this.spawnCount = t.spawnCount || 3; }
+  }
+  findTarget(){
+    if(this.onlyTower){ this.target=null; return; }
+    if(this.id==='arystan' && this.arystan && this.arystan.running){ this.target=null; return; }
+    let best=null, bd=Infinity;
+    for(const o of units){
+      if(o.team===this.team) continue;
+      if(!this.shoots && o.flying) continue;
+      const d = Math.hypot(o.x - this.x, o.y - this.y);
+      if(d<bd){ bd=d; best=o; }
+    }
+    if(best && bd < 150) this.target=best; else this.target=null;
+  }
+  act(dt){
+    const now = performance.now();
+    if(this.klimShot){
+      if(now - this.lastShot >= this.klimCooldown){
+        const goal = this.team==='player'? enemy.tower : player.tower;
+        projectiles.push(new Projectile(this.x,this.y,goal,'➡️',this.klimTowerDmg,this.team,true));
+        effects.push({x:goal.x+goal.w/2,y:goal.y+8,life:12,type:'hit'});
+        this.lastShot = now;
+      }
+      return;
+    }
+    if(this.id==='kaysar'){
+      if(now - (this.lastSpawn||0) >= this.spawnInterval){
+        for(let i=0;i<this.spawnCount;i++){
+          const sx = this.x + (Math.random()*40 - 20);
+          const sy = this.y + (Math.random()*30 - 15);
+          spawnUnitAt(sx, sy, 'firefly', this.team);
+        }
+        this.lastSpawn = now;
+      }
+    }
+    if(this.id==='arystan'){
+      const goal = this.team==='player'? enemy.tower : player.tower;
+      if(this.arystan.running){
+        const dx = (goal.x + goal.w/2) - this.x, dy = (goal.y + goal.h/2) - this.y;
+        const d = Math.hypot(dx,dy) || 1;
+        if(d > (this.range + 6)){
+          const nx = dx/d, ny = dy/d;
+          const perpX = -ny, perpY = nx;
+          const zigAmp = 10;
+          const zig = Math.sin(now/120 + this._zigphase) * zigAmp;
+          const move = this.speed * dt;
+          this.x += nx * move + perpX * zig * dt * 8;
+          this.y += ny * move + perpY * zig * dt * 8;
+          this.invulnerable = true;
+        } else {
+          this.arystan.running = false;
+          this.invulnerable = false;
+          this.arystan.startedAt = now;
+          this.arystan.lastTick = now;
+          const dir = this.team==='player' ? 1 : -1;
+          this.x = goal.x + goal.w/2 - dir * (goal.w/2 + this.size + 6);
+          this.y = goal.y + goal.h/2;
+          this.arystan.ratePerMs = (this.arystan.totalDamage) / (this.arystan.destroySeconds * 1000);
+        }
+        return;
+      } else {
+        const goal = this.team==='player'? enemy.tower : player.tower;
+        if(this.arystan.ratePerMs && goal.hp > 0){
+          const nowt = now - (this.arystan.lastTick || this.arystan.startedAt);
+          if(nowt > 0){
+            const dmg = this.arystan.ratePerMs * nowt;
+            goal.hp -= dmg;
+            this.arystan.lastTick = now;
+            effects.push({x:goal.x + goal.w/2,y:goal.y+8,life:12,type:'hit'});
+          }
+        }
+        return;
+      }
+    }
+
+    if(this.onlyTower){
+      const goal = this.team==='player'? enemy.tower : player.tower;
+      const dx = (goal.x + goal.w/2) - this.x, dy = (goal.y + goal.h/2) - this.y;
+      const d = Math.hypot(dx,dy);
+      if(d > this.range){ this.x += (dx/d)*this.speed*dt; this.y += (dy/d)*this.speed*dt; }
+      else {
+        if(this.explodeDamage){
+          goal.hp -= this.explodeDamage; effects.push({x:this.x,y:this.y,life:18,type:'splash',r:28}); this.hp=0;
+        } else {
+          goal.hp -= this.damage * dt * 1.6; effects.push({x:goal.x + goal.w/2,y:goal.y+8,life:12,type:'hit'}); cameraShake.intensity=Math.max(cameraShake.intensity,8);
+        }
+      }
+      return;
+    }
+
+    if(this.id==='sanjar'){
+      const goal = this.team==='player'? enemy.tower : player.tower;
+      const dx = (goal.x+goal.w/2)-this.x, dy=(goal.y+goal.h/2)-this.y;
+      const d = Math.hypot(dx,dy);
+      if(d>this.range){ this.x += (dx/d)*this.speed*dt; this.y += (dy/d)*this.speed*dt; }
+      else { if(now - this.lastShot > 400){ goal.hp -= this.damage*0.9; for(const other of units){ if(other.team===this.team) continue; const dd=Math.hypot(other.x-this.x,other.y-this.y); if(dd<=this.splashRadius){ other.hp -= this.damage*0.9; effects.push({x:other.x,y:other.y,life:12,type:'hit'}); } } effects.push({x:this.x,y:this.y,life:18,type:'splash',r:this.splashRadius}); this.lastShot = now; cameraShake.intensity=Math.max(cameraShake.intensity,6); } }
+      return;
+    }
+
+    if(this.target && this.target.hp>0){
+      if(this.target.flying && !this.shoots){ this.target=null; return; }
+      const dx = this.target.x - this.x, dy = this.target.y - this.y; const d = Math.hypot(dx,dy);
+      if(d > this.range){ this.x += (dx/d)*this.speed*dt; this.y += (dy/d)*this.speed*dt; }
+      else {
+        if(this.shoots && this.projectile){
+          if(now - this.lastShot > 300){ projectiles.push(new Projectile(this.x,this.y,this.target,'🌀',this.damage,this.team)); this.lastShot = now; }
+        } else {
+          if(!this.target.invulnerable){
+            this.target.hp -= this.damage * dt * 3.2;
+          }
+          effects.push({x:this.target.x,y:this.target.y,life:12,type:'hit'});
+        }
+      }
+      return;
+    }
+
+    const goal = this.team==='player'? enemy.tower : player.tower;
+    const dx = (goal.x + goal.w/2) - this.x, dy = (goal.y + goal.h/2) - this.y; const d = Math.hypot(dx,dy);
+    if(d > this.range){ this.x += (dx/d)*this.speed*dt; this.y += (dy/d)*this.speed*dt; }
+    else { goal.hp -= this.damage * dt * 0.8; effects.push({x:goal.x + goal.w/2,y:goal.y + 6,life:12,type:'hit'}); }
+  }
+  draw(){
+    ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.45)';
+    ctx.ellipse(this.x + cameraShake.x, this.y + this.size*0.45 + cameraShake.y, this.size*1.1*this.sizeScale, this.size*0.5*this.sizeScale, 0,0,Math.PI*2); ctx.fill();
+    let fillColor = (this.team==='player')? '#007bff' : '#b23a3a';
+    if(this.id==='sanjar' && (this.skin==='green' || selectedSkins['sanjar']==='green')) fillColor = '#29a63b';
+    ctx.beginPath(); ctx.fillStyle = fillColor;
+    ctx.arc(this.x + cameraShake.x, this.y + cameraShake.y, this.size*this.sizeScale, 0, Math.PI*2); ctx.fill();
+    if(this.id==='arystan' && this.arystan && this.arystan.running){
+      ctx.beginPath(); ctx.lineWidth = 3;
+      ctx.strokeStyle='rgba(255,230,120,0.9)';
+      ctx.arc(this.x + cameraShake.x, this.y + cameraShake.y, this.size*this.sizeScale + 6, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.font = Math.max(12,this.size) + "px serif"; ctx.fillStyle='#fff';
+    ctx.fillText(this.emoji, this.x - (this.size/1.7)*this.sizeScale + cameraShake.x, this.y + (this.size/2.6)*this.sizeScale + cameraShake.y);
+    const barW = (this.size*2) * this.sizeScale;
+    ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(this.x - this.size*this.sizeScale + cameraShake.x, this.y - this.size*this.sizeScale - 10 + cameraShake.y, barW, 6);
+    ctx.fillStyle='#7ef'; ctx.fillRect(this.x - this.size*this.sizeScale + cameraShake.x, this.y - this.size*this.sizeScale - 10 + cameraShake.y, barW * Math.max(0,this.hp)/Math.max(1,this.maxHp), 6);
+    if(this._selectedForSanjarSh){
+      ctx.beginPath(); ctx.strokeStyle='rgba(80,240,140,0.9)'; ctx.lineWidth = 3;
+      ctx.arc(this.x + cameraShake.x, this.y + cameraShake.y, this.size*this.sizeScale + 6, 0, Math.PI*2); ctx.stroke();
+    }
+    if(this.id==='sanjar'){ ctx.beginPath(); ctx.strokeStyle='rgba(120,200,255,0.06)'; ctx.lineWidth=2; ctx.arc(this.x + cameraShake.x, this.y + cameraShake.y, this.splashRadius, 0, Math.PI*2); ctx.stroke(); }
+  }
+}
+class Projectile {
+  constructor(x,y,target,emoji,damage,team,fast=false){
+    this.x=x; this.y=y; this.target=target; this.emoji=emoji; this.damage=damage; this.team=team; this.speed = fast?1000:480; this.life=2000;
+  }
+  update(dt){
+    if(!this.target || this.target.hp <= 0){ this.life = 0; return; }
+    if(this.target.invulnerable){ this.life = 0; return; }
+    const dx = this.target.x - this.x, dy = this.target.y - this.y; const d = Math.hypot(dx,dy);
+    if(d < 8){
+      if(this.target.hp !== undefined) this.target.hp -= this.damage;
+      effects.push({x:this.target.x,y:this.target.y,life:12,type:'hit'});
+      this.life = 0; return;
+    }
+    this.x += (dx/d) * this.speed * dt; this.y += (dy/d) * this.speed * dt; this.life -= dt*1000;
+  }
+  draw(){ ctx.font='18px Arial'; ctx.fillStyle='white'; ctx.fillText(this.emoji, this.x - 8 + cameraShake.x, this.y + cameraShake.y); }
+}
+
+/* ---------- effects ---------- */
+function drawEffects(){
+  for(let i = effects.length-1; i>=0; i--){
+    const e = effects[i];
+    if(e.type==='spawn'){ ctx.globalAlpha = Math.max(0, e.life/10); ctx.font='18px Arial'; ctx.fillStyle='#9df'; ctx.fillText('✨', e.x - 8 + cameraShake.x, e.y - 4 + cameraShake.y); ctx.globalAlpha=1; }
+    else if(e.type==='hit'){ ctx.font='16px Arial'; ctx.fillStyle='#ffd'; ctx.fillText('✦', e.x - 6 + cameraShake.x, e.y - 8 + cameraShake.y); }
+    else if(e.type==='splash'){ const a=Math.max(0,e.life/18); ctx.beginPath(); ctx.fillStyle=`rgba(80,180,255,${a*0.12})`; ctx.arc(e.x + cameraShake.x, e.y + cameraShake.y, e.r,0,Math.PI*2); ctx.fill(); }
+    e.life--; if(e.life<=0) effects.splice(i,1);
+  }
+}
+
+/* ---------- spawn helper ---------- */
+function spawnUnitAt(x,y,id,team,options={}){
+  const skin = options.skin || (team==='player' ? (selectedSkins[id] || 'default') : 'default');
+  const u = new Unit(x,y,team,id,skin);
+  units.push(u);
+  effects.push({x:x,y:y,life:12,type:'spawn'});
+  return u;
+}
+
+/* ---------- input: placing units & sanjarSh ---------- */
+canvas.addEventListener('click', ev=>{
+  if(!gameRunning) return;
+  if(sanjarShMode){
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+    let found = null;
+    for(const u of units){ if(u.team!=='player') continue; const d=Math.hypot(u.x-x,u.y-y); if(d <= u.size*1.5){ found=u; break; } }
+    if(found){ units.forEach(u=>u._selectedForSanjarSh=false); found._selectedForSanjarSh = true; showSanjarShChoice(found); }
+    return;
+  }
+  if(!selectedType) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (ev.clientY - rect.top) * (canvas.height / rect.height);
+  if(x > W/2){ flashMsg('Ставить можно только на своей половине', true); return; }
+  const id = emojiToId(selectedType);
+  const t = tpl(id);
+  if(player.elixir < t.cost){ flashMsg('Недостаточно эликсира', true); return; }
+  if(isAltairId(id)){
+    const offsets = [-12, 12];
+    for(const off of offsets) spawnUnitAt(x + off, y + (Math.random()*8 - 4), id, 'player');
+    player.elixir -= t.cost;
+    return;
+  }
+  spawnUnitAt(x,y,id,'player');
+  player.elixir -= t.cost;
+});
+
+/* ---------- find id by emoji/name ---------- */
+function emojiToId(emoji){
+  const f = ALL_CARDS.find(c => c.emoji === emoji || c.id === emoji || c.name === emoji);
+  return f ? f.id : null;
+}
+
+/* ---------- enemy AI ---------- */
+function enemyThink(now){
+  enemy.elixir = Math.min(enemy.maxElixir, enemy.elixir + 0.02 * (now - lastTime)/16);
+  if(now - enemy.lastPlay < enemy.playInterval) return;
+  enemy.lastPlay = now;
+  const deck = enemyDeck.length ? enemyDeck : ALL_CARDS.map(c=>c.id).filter(id=>id!=='firefly');
+  const affordable = deck.filter(id => (tpl(id).cost || 2) <= enemy.elixir);
+  if(affordable.length === 0) return;
+  let pick = affordable[Math.floor(Math.random()*affordable.length)];
+  if(Math.random() < 0.12 && affordable.includes('arystan')) pick='arystan';
+  if(Math.random() < 0.12 && affordable.includes('altair')) pick='altair';
+  if(Math.random() < 0.08 && affordable.includes('klim')) pick='klim';
+  const y = H/2 + (Math.random()-0.5)*140;
+  if(isAltairId(pick)){
+    const baseX = W - 80; const offsets = [-12, 12];
+    for(const off of offsets) spawnUnitAt(baseX + off, y + (Math.random()*8 - 4), pick, 'enemy');
+    enemy.elixir -= (tpl(pick).cost || 2);
+  } else {
+    spawnUnitAt(W - 80, y, pick, 'enemy'); enemy.elixir -= (tpl(pick).cost || 2);
+  }
+}
+
+/* ---------- world update ---------- */
+function updateWorld(dt){
+  const now = performance.now();
+  for(let i=projectiles.length-1;i>=0;i--){ const p=projectiles[i]; p.update(dt); if(p.life<=0) projectiles.splice(i,1); }
+  for(let i=units.length-1;i>=0;i--){
+    const u = units[i];
+    if(u.hp <= 0){ effects.push({x:u.x,y:u.y,life:12,type:'spawn'}); units.splice(i,1); continue; }
+    u.findTarget();
+    u.act(dt);
+  }
+  if(cameraShake.intensity>0){ cameraShake.x=(Math.random()-0.5)*cameraShake.intensity; cameraShake.y=(Math.random()-0.5)*cameraShake.intensity; cameraShake.intensity *= 0.82; if(cameraShake.intensity<0.5){ cameraShake.intensity=0; cameraShake.x=0; cameraShake.y=0; } }
+}
+
+/* ---------- render ---------- */
+function render(){
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.02)'; ctx.beginPath(); ctx.moveTo(W/2 + cameraShake.x,20 + cameraShake.y); ctx.lineTo(W/2 + cameraShake.x,H-20 + cameraShake.y); ctx.stroke();
+  drawTower(player.tower,'blue'); drawTower(enemy.tower,'red');
+  for(const u of units) u.draw();
+  for(const p of projectiles) p.draw();
+  drawEffects();
+}
+function drawTower(t,color){
+  ctx.fillStyle = color; ctx.fillRect(t.x + cameraShake.x, t.y + cameraShake.y, t.w, t.h);
+  ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(t.x - 6 + cameraShake.x, t.y - 18 + cameraShake.y, t.w + 12, 10);
+  const ratio = Math.max(0,t.hp)/Math.max(1,t.maxHp);
+  ctx.fillStyle = (color==='blue'?'#66ffb0':'#ff9fbf'); ctx.fillRect(t.x - 6 + cameraShake.x, t.y - 18 + cameraShake.y, (t.w + 12) * ratio, 10);
+  ctx.font='12px Arial'; ctx.fillStyle='#ddd'; ctx.fillText(Math.max(0,Math.round(t.hp)), t.x + t.w/2 - 8 + cameraShake.x, t.y - 24 + cameraShake.y);
+}
+
+/* ---------- main loop ---------- */
+function gameLoop(ts){
+  if(!gameRunning) return;
+  const dt = Math.min(0.05, (ts - lastTime)/1000);
+  player.elixir = Math.min(player.maxElixir, player.elixir + 1.0 * dt);
+  enemy.elixir = Math.min(enemy.maxElixir, enemy.elixir + 0.9 * dt);
+  // update elixir bar
+  const pct = Math.round((player.elixir / player.maxElixir) * 100);
+  elixirFill.style.width = pct + '%';
+  if(sanjarShCooldown > 0) sanjarShCooldown = Math.max(0, sanjarShCooldown - (ts - lastTime));
+  playerHpEl.textContent = Math.max(0, Math.round(player.tower.hp)); enemyHpEl.textContent = Math.max(0, Math.round(enemy.tower.hp));
+  const elapsed = ts - matchStartTime; const remain = Math.max(0, matchDuration - elapsed);
+  const mm = String(Math.floor(remain/60000)).padStart(2,'0'); const ss = String(Math.floor(remain%60000/1000)).padStart(2,'0');
+  document.querySelector('.timer') && (document.querySelector('.timer').textContent = `${mm}:${ss}`);
+  if(remain <= 0){ finishMatchByTimeout(); return; }
+  enemyThink(ts);
+  updateWorld(dt);
+  render();
+  if(enemy.tower.hp <= 0 || player.tower.hp <= 0){ finishMatch(enemy.tower.hp<=0 ? 'win' : 'lose'); return; }
+  lastTime = ts; requestAnimationFrame(gameLoop);
+}
+
+/* ---------- finish ---------- */
+function finishMatch(result){
+  gameRunning = false;
+  const text = result === 'win' ? 'Ты выиграл!' : 'Ты проиграл!';
+  ctx.fillStyle='white'; ctx.font='48px Arial'; ctx.fillText(text, W/2 - 150 + cameraShake.x, H/2 + cameraShake.y);
+  restartBtn.style.display = 'block';
+}
+function finishMatchByTimeout(){
+  if(Math.round(player.tower.hp) === Math.round(enemy.tower.hp)){
+    const coin = Math.random() < 0.5 ? 'win' : 'lose'; finishMatch(coin);
+  } else { finishMatch(player.tower.hp > enemy.tower.hp ? 'win' : 'lose'); }
+}
+
+/* ---------- UI & play ---------- */
+function flashMsg(text, danger=false){
+  msgBox.style.display='block'; msgBox.textContent = text; msgBox.style.background = danger? 'rgba(200,40,40,0.9)': 'rgba(0,0,0,0.6)';
+  msgBox.style.opacity = 1;
+  setTimeout(()=>{ msgBox.style.opacity = 0; setTimeout(()=>{ msgBox.style.display='none'; },300); }, 1400);
+}
+playBtn.addEventListener('click', ()=>{
+  if(selectedDeck.length === 0){ flashMsg('Выберите колоду (1–5 карт) перед стартом', true); return; }
+  player.deck = selectedDeck.slice(0,5).map(id => ALL_CARDS.find(c=>c.id===id));
+  enemyDeck = [];
+  const pool = ALL_CARDS.map(c=>c.id).filter(id=>id!=='firefly');
+  while(enemyDeck.length < 5){ const p = pool[Math.floor(Math.random()*pool.length)]; if(!enemyDeck.includes(p)) enemyDeck.push(p); }
+  hudTop.style.display = 'flex';
+  elixirBarWrap.style.display = 'block';
+  document.getElementById('ui').style.display = 'flex';
+  document.getElementById('menuPanels').style.display = 'none';
+  const t0 = performance.now();
+  loadingScreen.style.display='flex';
+  function loadAnim(now){ const elapsed=now-t0; const step=Math.floor((elapsed/300)%4); loadingDots.textContent=['.','..','...',''][step]||'...'; if(elapsed>=700){ loadingScreen.style.display='none'; startGame(); return; } requestAnimationFrame(loadAnim); }
+  requestAnimationFrame(loadAnim);
+});
+quickPlay.addEventListener('click', ()=>{ document.querySelector('[data-tab="minigames"]').click(); });
+openGuide.addEventListener('click', ()=>{ document.querySelector('[data-tab="guide"]').click(); });
+
+/* ---------- build bottom UI ---------- */
+function buildBottomUI(){
+  document.querySelectorAll('.unitBtn').forEach(n=>n.remove());
+  const active = player.deck.length ? player.deck : [];
+  active.forEach(card=>{
+    const btn = document.createElement('button'); btn.className='unitBtn'; btn.dataset.id = card.id; btn.dataset.type = card.emoji; btn.dataset.cost = card.cost;
+    btn.innerHTML = `<div class="nameLbl">${card.name}</div><span class="cost">${card.cost}⚡</span><div style="font-size:22px">${card.emoji}</div>`;
+    if(selectedSkins[card.id]){
+      if(selectedSkins[card.id] === 'invulnerable') btn.style.boxShadow = '0 8px 30px rgba(255,215,0,0.06)';
+      if(selectedSkins[card.id] === 'green') btn.style.boxShadow = '0 8px 30px rgba(32,178,74,0.06)';
+    }
+    btn.addEventListener('click', ()=>{ if(btn.classList.contains('disabled')) return; document.querySelectorAll('.unitBtn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); selectedType = btn.dataset.type; selectedCost = parseInt(btn.dataset.cost,10); });
+    ui.insertBefore(btn, abilityPanel);
+  });
+  abilityPanel.innerHTML = '';
+  const hasSanjarSh = player.deck.some(d=>d.id === 'sanjar_sh');
+  if(hasSanjarSh){
+    const abilityBtn = document.createElement('button'); abilityBtn.className='abilityBtn'; abilityBtn.id='sanjarShBtn'; abilityBtn.textContent='СанжарШ';
+    abilityBtn.addEventListener('click', ()=>{
+      if(sanjarShCooldown > 0){ flashMsg('Способность на перезарядке', true); return; }
+      sanjarShMode = !sanjarShMode; abilityBtn.classList.toggle('active', sanjarShMode);
+      if(sanjarShMode) flashMsg('Кликните по союзному юниту для выбора');
+      else { units.forEach(u=>u._selectedForSanjarSh=false); }
+    });
+    const cdLabel = document.createElement('div'); cdLabel.id='sanjarShCooldown'; cdLabel.textContent='Готов';
+    abilityPanel.appendChild(abilityBtn); abilityPanel.appendChild(cdLabel);
+  }
+}
+function startGame(){
+  units=[]; projectiles=[]; effects=[];
+  player.tower.hp = player.tower.maxHp = 320; enemy.tower.hp = enemy.tower.maxHp = 320;
+  player.elixir = 0; player.maxElixir = 10; enemy.elixir = 0; enemy.maxElixir = 9;
+  lastTime = performance.now(); matchStartTime = performance.now(); enemy.lastPlay = performance.now();
+  gameRunning = true; restartBtn.style.display='none';
+  buildBottomUI(); sanjarShCooldown = 0; sanjarShMode = false;
+  requestAnimationFrame(gameLoop);
+}
+
+/* ---------- SanjarSh UI ---------- */
+function showSanjarShChoice(unit){
+  const menu = document.createElement('div'); menu.style.position='fixed'; menu.style.zIndex='999'; menu.style.background='linear-gradient(180deg,#0b0b0b,#121212)'; menu.style.border='1px solid rgba(255,255,255,0.06)';
+  menu.style.padding='6px'; menu.style.borderRadius='8px'; menu.style.display='flex'; menu.style.gap='6px'; menu.style.boxShadow='0 12px 30px rgba(0,0,0,0.5)';
+  menu.innerHTML = `<button id="shInc" style="padding:6px;border-radius:6px;background:#2ece8a;border:none">Увеличить</button>
+                    <button id="shDec" style="padding:6px;border-radius:6px;background:#ff7b7b;border:none">Уменьшить</button>
+                    <button id="shCancel" style="padding:6px;border-radius:6px;background:#666;border:none">Отмена</button>`;
+  document.body.appendChild(menu);
+  const r = canvas.getBoundingClientRect();
+  menu.style.left = (r.left + unit.x + 20) + 'px';
+  menu.style.top = (r.top + unit.y - 10) + 'px';
+  document.getElementById('shCancel').addEventListener('click', ()=>{ units.forEach(u=>u._selectedForSanjarSh=false); sanjarShMode=false; const btn=document.getElementById('sanjarShBtn'); if(btn) btn.classList.remove('active'); menu.remove(); });
+  document.getElementById('shInc').addEventListener('click', ()=>{ applySanjarSh(unit,'inc'); menu.remove(); });
+  document.getElementById('shDec').addEventListener('click', ()=>{ applySanjarSh(unit,'dec'); menu.remove(); });
+}
+function applySanjarSh(unit,mode){
+  if(sanjarShCooldown > 0){ flashMsg('Способность на перезарядке', true); return; }
+  if(unit.team !== 'player') return;
+  if(mode === 'inc'){ unit.maxHp *= 1.45; unit.hp *= 1.45; unit.speed *= 0.5; unit.sizeScale *= 1.12; }
+  else { unit.maxHp *= 0.7; unit.hp *= 0.7; unit.speed *= 1.3; unit.sizeScale *= 0.85; }
+  unit._selectedForSanjarSh = false; sanjarShCooldown = sanjarShCooldownMs; sanjarShMode = false; const btn = document.getElementById('sanjarShBtn'); if(btn) btn.classList.remove('active'); flashMsg(mode==='inc'?'Юнит увеличен':'Юнит уменьшен');
+}
+
+/* ---------- refresh cooldown ---------- */
+function refreshAbilityCooldownLabel(){
+  const lbl = document.getElementById('sanjarShCooldown'); if(!lbl) return;
+  lbl.textContent = sanjarShCooldown <= 0 ? 'Готов' : `Перк: ${(sanjarShCooldown/1000).toFixed(1)}с`;
+}
+setInterval(()=>{ if(gameRunning) refreshAbilityCooldownLabel(); }, 120);
+
+/* ---------- fallback enemy spawner ---------- */
+setInterval(()=>{ if(gameRunning && enemy.elixir >= 2 && Math.random() < 0.10){ const pool = enemyDeck.length?enemyDeck:ALL_CARDS.map(c=>c.id).filter(id=>id!=='firefly'); const pick = pool[Math.floor(Math.random()*pool.length)]; const y = H/2 + (Math.random()-0.5)*160;
+  if(isAltairId(pick)){
+    const baseX = W - 80; const offsets = [-12, 12];
+    for(const off of offsets) spawnUnitAt(baseX + off, y + (Math.random()*8 - 4), pick, 'enemy');
+    enemy.elixir -= (tpl(pick).cost || 2);
+  } else {
+    spawnUnitAt(W - 80, y, pick, 'enemy'); enemy.elixir -= (tpl(pick).cost || 2);
+  }
+} }, 1200);
+
+/* ---------- initial loading -> show menu ---------- */
+let initialStart = performance.now();
+function initialAnim(ts){ const elapsed = ts - initialStart; const step = Math.floor((elapsed/350)%4); loadingDots.textContent = '.'.repeat(step+1); if(elapsed >= 900){ loadingScreen.style.display='none'; document.getElementById('menuPanels').style.display='grid'; return; } requestAnimationFrame(initialAnim); }
+requestAnimationFrame(initialAnim);
+
+/* ---------- keyboard shortcuts 1..5 ---------- */
+window.addEventListener('keydown', e=>{ const idx = parseInt(e.key) - 1; if(!isNaN(idx) && idx >=0){ const btns = Array.from(document.querySelectorAll('.unitBtn')); if(btns[idx]) btns[idx].click(); } });
+
+/* ---------- refresh UI buttons for deck ---------- */
+function refreshUIButtonsForDeck(){ const active = player.deck && player.deck.length ? player.deck.map(x=>x.id) : ALL_CARDS.map(c=>c.id); document.querySelectorAll('.unitBtn').forEach(btn=>{ const id = btn.dataset.id; if(active.includes(id)) btn.classList.remove('disabled'); else btn.classList.add('disabled'); }); }
+
+/* ---------- restart ---------- */
+restartBtn.addEventListener('click', ()=>{ restartBtn.style.display='none'; document.getElementById('menuPanels').style.display='grid'; hudTop.style.display='none'; elixirBarWrap.style.display='none'; document.getElementById('ui').style.display='none'; selectedType=null; selectedCost=0; });
+
+/* =================== Mini-game: Snake (working, restart) =================== */
+let snakeRunning = false;
+let snakeState = null;
+const mc = miniCanvas; const mctx = mc.getContext('2d');
+function initSnake(){ snakeState = { w:20, h:15, dir:'right', body: [{x:7,y:7},{x:8,y:7},{x:9,y:7}], apple:{x:5,y:5}, speed:8, score:0, last:performance.now(), over:false }; snakeRunning=true; mc.width=480; mc.height=360; miniWrap.style.display='block'; requestAnimationFrame(runSnake); }
+function runSnake(ts){ if(!snakeRunning) return; const s=snakeState;
+  const now = ts || performance.now();
+  const elapsed = now - s.last;
+  const interval = Math.max(40, (Math.max(0.5,12 - s.speed)/60)*1000);
+  if(elapsed >= interval && !s.over){
+    s.last = now;
+    const head = {x: s.body[s.body.length-1].x, y: s.body[s.body.length-1].y};
+    if(s.dir==='right') head.x++; if(s.dir==='left') head.x--; if(s.dir==='up') head.y--; if(s.dir==='down') head.y++;
+    if(head.x < 0) head.x = s.w-1; if(head.x >= s.w) head.x = 0; if(head.y<0) head.y = s.h-1; if(head.y>=s.h) head.y=0;
+    s.body.push(head);
+    if(head.x === s.apple.x && head.y === s.apple.y){ s.score++; placeApple(); s.speed = Math.min(14, s.speed + 0.2); } else { s.body.shift(); }
+    const collided = s.body.slice(0,-1).some(b=>b.x===head.x && b.y===head.y);
+    if(collided){ s.over = true; }
+  }
+  // draw
+  mctx.fillStyle='#02060a'; mctx.fillRect(0,0,mc.width,mc.height);
+  const cw = mc.width / s.w, ch = mc.height / s.h;
+  mctx.fillStyle='#ffcc00'; mctx.fillRect(s.apple.x*cw+2, s.apple.y*ch+2, cw-4, ch-4);
+  mctx.fillStyle='#66ccff'; for(const b of s.body){ mctx.fillRect(b.x*cw+1, b.y*ch+1, cw-2, ch-2); }
+  mctx.fillStyle='#fff'; mctx.font='16px Arial'; mctx.fillText('Score: '+s.score,8,20);
+  if(s.over){
+    mctx.fillStyle='rgba(0,0,0,0.6)'; mctx.fillRect(0, mc.height/2 - 36, mc.width, 72);
+    mctx.fillStyle='#fff'; mctx.font='20px Arial'; mctx.fillText('Game Over', mc.width/2 - 60, mc.height/2 + 6);
+    mctx.font='14px Arial'; mctx.fillText('Набрано очков: ' + s.score, mc.width/2 - 60, mc.height/2 + 30);
+    // show restart hint
+    mctx.font='12px Arial'; mctx.fillText('Нажмите R для перезапуска', mc.width/2 - 80, mc.height/2 + 52);
+  }
+  requestAnimationFrame(runSnake);
+}
+function placeApple(){ const s=snakeState; let x,y,ok=false; while(!ok){ x = Math.floor(Math.random()*s.w); y = Math.floor(Math.random()*s.h); ok = !s.body.some(b=>b.x===x&&b.y===y); } s.apple = {x,y}; }
+window.addEventListener('keydown', e=>{ if(!snakeRunning) return; const s=snakeState; const k=e.key; if(k==='ArrowUp' && s.dir!=='down') s.dir='up'; if(k==='ArrowDown' && s.dir!=='up') s.dir='down'; if(k==='ArrowLeft' && s.dir!=='right') s.dir='left'; if(k==='ArrowRight' && s.dir!=='left') s.dir='right'; if(k==='r' || k==='R'){ if(s.over){ initSnake(); } } });
+startSnakeBtn.addEventListener('click', ()=>{ sanjarJumpStop(); initSnake(); });
+
+/* =================== Mini-game: Sanjar Jump (much harder, left/right) =================== */
+let sanjarJumpRunning = false;
+let sj = null;
+function sanjarJumpInit(){
+  snakeRunning = false;
+  sanjarJumpRunning = true;
+  mc.width = 480; mc.height = 360; miniWrap.style.display='block';
+  sj = {
+    px: mc.width/2, py: mc.height - 48, pw: 28, ph: 18,
+    vx:0, vy: 0, gravity: 0.6, jumpStrength: -12,
+    platforms: [], spikes: [], pickups: [], score:0, cameraY:0, lastSpawn:0, maxPlatforms:12, prevTs: performance.now(),
+    bgOffset:0, difficulty:1, moveTargetX:null
+  };
+  let y = mc.height - 20;
+  for(let i=0;i<12;i++){
+    const w = 70 + Math.floor(Math.random()*120) * (i<4?1.4:1);
+    const x = Math.max(12, Math.floor(Math.random()*(mc.width - w - 24)));
+    sj.platforms.push({x:x, y:y, w:w, h:10, vx: (Math.random()<0.3? (Math.random()*40-20) : 0)});
+    if(Math.random() < 0.18 && i>2){
+      sj.spikes.push({x: x + Math.random()*(w-20)+10, y: y - 8, w:10, h:8});
+    }
+    y -= 70;
+  }
+  sj.py = sj.platforms[sj.platforms.length-1].y - 30;
+  sj.vy = 0; sj.vx = 0; sj.score = 0; sj.cameraY = 0; sj.pickups = []; sj.lastSpawn = performance.now();
+  // best record persist
+  sj.record = parseInt(localStorage.getItem('sj_record') || '0', 10);
+  requestAnimationFrame(sanjarJumpStep);
+}
+function sanjarJumpStop(){ sanjarJumpRunning = false; sj = null; }
+function sanjarJumpStep(ts){
+  if(!sanjarJumpRunning || !sj) return;
+  const now = ts;
+  const dt = Math.min(1/30, (now - (sj.prevTs||now))/1000);
+  sj.prevTs = now;
+  // increase difficulty over time
+  sj.difficulty = 1 + (Math.floor((now - initialStart)/20000))*0.12;
+  sj.vy += sj.gravity * (1 + sj.difficulty*0.08);
+  // horizontal movement decay
+  sj.vx *= 0.92;
+  sj.px += sj.vx;
+  sj.py += sj.vy;
+  // clamp horizontally
+  if(sj.px < 12) sj.px = 12;
+  if(sj.px > mc.width-12) sj.px = mc.width-12;
+  // camera upward when high
+  if(sj.py < mc.height * 0.44){
+    const diff = (mc.height * 0.44) - sj.py;
+    sj.py = mc.height * 0.44;
+    sj.cameraY += diff;
+    sj.score += Math.floor(diff * 0.4);
+    for(let p of sj.platforms) p.y += diff;
+    for(let pk of sj.pickups) pk.y += diff;
+    for(let sp of sj.spikes) sp.y += diff;
+  }
+  // platform collisions when falling
+  if(sj.vy > 0){
+    for(const p of sj.platforms){
+      if(sj.py + sj.ph/2 <= p.y && sj.py + sj.ph/2 + sj.vy >= p.y){
+        if(sj.px + sj.pw/2 > p.x && sj.px - sj.pw/2 < p.x + p.w){
+          sj.py = p.y - sj.ph/2; sj.vy = sj.jumpStrength * (1 - Math.min(0.4, sj.difficulty*0.08));
+          // small horizontal bump when platform moving
+          sj.vx += (p.vx || 0) * 0.03;
+          break;
+        }
+      }
+    }
+  }
+  // moving platforms update
+  for(const p of sj.platforms){
+    if(p.vx){
+      p.x += p.vx * dt * sj.difficulty;
+      if(p.x < 8){ p.x = 8; p.vx *= -1; }
+      if(p.x + p.w > mc.width - 8){ p.x = mc.width - 8 - p.w; p.vx *= -1; }
+    }
+  }
+  // spawn new platforms dynamically
+  while(sj.platforms.length < sj.maxPlatforms){
+    const lastY = sj.platforms[0] ? sj.platforms[0].y : -40;
+    const newY = lastY - (48 + Math.random()*80);
+    const w = 70 + Math.floor(Math.random()*160);
+    const x = Math.max(12, Math.floor(Math.random()*(mc.width - w - 24)));
+    const vx = Math.random()<0.25 ? (Math.random()*60 - 30) : 0;
+    sj.platforms.unshift({x:x, y:newY, w:w, h:10, vx: vx});
+    if(Math.random() < 0.22){
+      sj.spikes.unshift({x: x + Math.random()*(w-20)+10, y: newY - 8, w:10, h:8});
+    }
+  }
+  // remove platforms far below
+  for(let i=sj.platforms.length-1;i>=0;i--){ if(sj.platforms[i].y > mc.height + 80) sj.platforms.splice(i,1); }
+  for(let i=sj.spikes.length-1;i>=0;i--){ if(sj.spikes[i].y > mc.height + 80) sj.spikes.splice(i,1); }
+  // pickups spawn and collection
+  if(now - sj.lastSpawn > 900 && Math.random() < 0.65){
+    const p = sj.platforms[Math.floor(Math.random()*sj.platforms.length)];
+    sj.pickups.push({x: p.x + Math.random()*(p.w-16)+8, y: p.y - 18, r:6, taken:false});
+    sj.lastSpawn = now;
+  }
+  for(let i=sj.pickups.length-1;i>=0;i--){
+    const pk = sj.pickups[i];
+    const dx = (sj.px - pk.x), dy = (sj.py - pk.y); const d = Math.hypot(dx,dy);
+    if(d < 26){ sj.score += 25; sj.pickups.splice(i,1); }
+  }
+  // spike collision
+  for(const sp of sj.spikes){
+    if(sj.px + sj.pw/2 > sp.x && sj.px - sj.pw/2 < sp.x + sp.w && sj.py + sj.ph/2 > sp.y && sj.py - sj.ph/2 < sp.y + sp.h){
+      // hit spike -> game over
+      sanjarJumpRunning = false;
+      drawSanjarFrame(true);
+      if(sj.score > sj.record){ localStorage.setItem('sj_record', String(sj.score)); }
+      setTimeout(()=>{ miniWrap.style.display='none'; }, 900);
+      return;
+    }
+  }
+  // death if falls too low
+  if(sj.py - sj.ph/2 > mc.height + 60){
+    sanjarJumpRunning = false;
+    drawSanjarFrame(true);
+    if(sj.score > sj.record){ localStorage.setItem('sj_record', String(sj.score)); }
+    setTimeout(()=>{ miniWrap.style.display='none'; }, 900);
+    return;
+  }
+  // update score and gradually increase gravity for difficulty
+  drawSanjarFrame(false);
+  requestAnimationFrame(sanjarJumpStep);
+}
+function drawSanjarFrame(gameOver){
+  const ctxm = mctx;
+  // background
+  const b0 = '#020610', b1 = '#043049';
+  const g = ctxm.createLinearGradient(0,0,0,mc.height);
+  g.addColorStop(0,b0); g.addColorStop(1,b1);
+  ctxm.fillStyle = g; ctxm.fillRect(0,0,mc.width,mc.height);
+  // subtle stars parallax
+  sj.bgOffset = (sj.bgOffset || 0) + 0.9;
+  for(let i=0;i<30;i++){
+    const x = (i*37 + (sj.bgOffset*(i%5)))%mc.width;
+    const y = (i*19 + (sj.bgOffset*(i%7)))%mc.height;
+    ctxm.fillStyle = 'rgba(255,255,255,0.03)'; ctxm.fillRect(x, y, 2, 2);
+  }
+  // draw platforms
+  ctxm.fillStyle = '#2b6';
+  for(const p of sj.platforms) ctxm.fillRect(Math.round(p.x), Math.round(p.y), Math.round(p.w), p.h);
+  // moving platform indicator
+  ctxm.fillStyle = '#e6e6e6';
+  for(const p of sj.platforms) if(p.vx) { ctxm.fillRect(Math.round(p.x + p.w - 8), Math.round(p.y - 4), 6, 4); }
+  // spikes
+  for(const sp of sj.spikes){
+    ctxm.fillStyle = '#ff4d4d';
+    ctxm.beginPath(); ctxm.moveTo(sp.x, sp.y+sp.h); ctxm.lineTo(sp.x + sp.w/2, sp.y); ctxm.lineTo(sp.x + sp.w, sp.y+sp.h); ctxm.closePath(); ctxm.fill();
+  }
+  // pickups
+  for(const pk of sj.pickups){ ctxm.fillStyle = '#ffcc00'; ctxm.beginPath(); ctxm.arc(pk.x, pk.y, pk.r, 0, Math.PI*2); ctxm.fill(); }
+  // draw sanjar
+  ctxm.save();
+  ctxm.translate(sj.px, sj.py);
+  ctxm.fillStyle = '#66ccff';
+  ctxm.beginPath(); ctxm.ellipse(0,0,sj.pw/2,sj.ph/2,0,0,Math.PI*2); ctxm.fill();
+  ctxm.fillStyle='#fff'; ctxm.font='18px serif'; ctxm.fillText('🛩️', -10, 6);
+  ctxm.restore();
+  // score & record & difficulty
+  ctxm.fillStyle = '#fff'; ctxm.font='16px Arial'; ctxm.fillText('Score: '+Math.floor(sj.score), 10, 20);
+  ctxm.fillStyle = '#ffd700'; ctxm.font='13px Arial'; ctxm.fillText('Record: '+(sj.record || 0), mc.width - 110, 20);
+  ctxm.fillStyle = '#fff'; ctxm.font='12px Arial'; ctxm.fillText('Difficulty: x' + sj.difficulty.toFixed(2), mc.width - 140, 38);
+  if(gameOver){
+    ctxm.fillStyle='rgba(0,0,0,0.6)'; ctxm.fillRect(0, mc.height/2 - 36, mc.width, 72);
+    ctxm.fillStyle='#fff'; ctxm.font='22px Arial'; ctxm.fillText('Game Over', mc.width/2 - 60, mc.height/2 + 6);
+    ctxm.font='14px Arial'; ctxm.fillText('Score: ' + Math.floor(sj.score), mc.width/2 - 60, mc.height/2 + 30);
+  }
+}
+function sanjarJumpJump(){ if(!sanjarJumpRunning || !sj) return; sj.vy = sj.jumpStrength; }
+function sanjarMoveLeft(){ if(!sanjarJumpRunning || !sj) return; sj.vx -= 4 * (1 + sj.difficulty*0.08); }
+function sanjarMoveRight(){ if(!sanjarJumpRunning || !sj) return; sj.vx += 4 * (1 + sj.difficulty*0.08); }
+window.addEventListener('keydown', (e)=>{ if(sanjarJumpRunning){ if(e.code === 'Space' || e.key === ' ') { e.preventDefault(); sanjarJumpJump(); } if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') sanjarMoveLeft(); if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') sanjarMoveRight(); }});
+miniCanvas.addEventListener('click', ()=>{ if(sanjarJumpRunning) sanjarJumpJump(); });
+startSanjarBtn.addEventListener('click', ()=>{ snakeRunning=false; sanjarJumpInit(); });
+closeMini.addEventListener('click', ()=>{ snakeRunning=false; sanjarJumpStop(); miniWrap.style.display='none'; });
+
+/* ---------- utilities & exposure ---------- */
+function emojiToId(emoji){ const f = ALL_CARDS.find(c => c.emoji === emoji || c.id === emoji || c.name === emoji); return f ? f.id : null; }
+window.__mr = { startGame, spawnUnitAt, ALL_CARDS };
+
+/* ========== end of script ========== */
+</script>
+</body>
+</html>

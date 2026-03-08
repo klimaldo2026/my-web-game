@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>NIS Play — СКОРО В ИГРЕ</title>
+    <style>
+        * { box-sizing: border-box; }
+        
+        body { 
+            margin: 0; padding: 0;
+            background: #000 url('../10.png') no-repeat center center fixed;
+            background-size: cover;
+            color: #fff; font-family: 'Segoe UI', Impact, sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        /* Затемнение и блюр фона */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(12px);
+            z-index: 1;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            background: #000;
+            border: 8px solid #fff;
+            padding: 60px;
+            max-width: 700px;
+            text-align: center;
+            box-shadow: 25px 25px 0px #ff00ff;
+            /* Легкая пульсация рамки */
+            animation: pulse 2s infinite alternate;
+        }
+
+        h1 {
+            font-size: 80px;
+            margin: 0;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 8px 8px 0px #00f2ff, -5px -5px 0px #ff00ff;
+            line-height: 0.9;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #00f2ff;
+            color: #000;
+            font-weight: 900;
+            padding: 10px 25px;
+            margin: 30px 0;
+            font-size: 24px;
+            transform: rotate(-2deg);
+            text-transform: uppercase;
+        }
+
+        p {
+            font-size: 22px;
+            line-height: 1.6;
+            margin: 0;
+            color: #eee;
+            font-weight: 600;
+        }
+
+        .hint {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        @keyframes pulse {
+            from { box-shadow: 20px 20px 0px #ff00ff; }
+            to { box-shadow: 30px 30px 0px #00f2ff; }
+        }
+
+        .tech-info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-family: monospace;
+            color: #ff00ff;
+            font-size: 12px;
+            text-align: right;
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>STAY TUNED</h1>
+        
+        <div class="status-badge">РАБОТАЕМ НАД ЭТИМ</div>
+        
+        <p>
+            Эта игра еще не прогрузилась. <br>
+            Админ уже фиксит код и заливает ассеты.
+        </p>
+        
+        <div class="hint">Используй верхнюю кнопку [X], чтобы выйти</div>
+    </div>
+
+    <div class="tech-info">
+        SECTOR: RESTRICTED<br>
+        BUILD: IN_PROGRESS<br>
+        NIS_DEV_MODE: ACTIVE
+    </div>
+
+</body>
+</html>
